@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, RotateCcw, BookOpen, Keyboard } from 'lucide-react';
+import { Play, RotateCcw, BookOpen, Keyboard, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import TextPanel from '@/components/TextPanel';
@@ -55,16 +55,20 @@ const Index = () => {
     });
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-6 space-y-6">
-        {/* Dashboard */}
+        {/* Dashboard at Top */}
         <Dashboard stats={stats} />
 
         {/* Text Panels */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-6 no-print">
           <TextPanel
             label="Master Text"
             placeholder="Enter the original/master text here... (Hindi and English supported)"
@@ -77,17 +81,21 @@ const Index = () => {
             placeholder="Enter the student's typed text here..."
             value={typedText}
             onChange={setTypedText}
-            icon={<Keyboard className="w-5 h-5 text-info" />}
+            icon={<Keyboard className="w-5 h-5 text-primary" />}
           />
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button size="lg" onClick={handleAnalyze} className="min-w-[200px]">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center no-print">
+          <Button size="lg" onClick={handleAnalyze} className="min-w-[180px]">
             <Play className="w-5 h-5" />
-            Analyze Accuracy
+            Analyze
           </Button>
-          <Button size="lg" variant="outline" onClick={handleReset} className="min-w-[200px]">
+          <Button size="lg" variant="outline" onClick={handlePrint} className="min-w-[180px]" disabled={results.length === 0}>
+            <Printer className="w-5 h-5" />
+            Print
+          </Button>
+          <Button size="lg" variant="outline" onClick={handleReset} className="min-w-[180px]">
             <RotateCcw className="w-5 h-5" />
             Reset
           </Button>
@@ -98,7 +106,7 @@ const Index = () => {
       </main>
 
       {/* Footer */}
-      <footer className="py-4 text-center text-sm text-muted-foreground border-t border-border">
+      <footer className="py-4 text-center text-sm text-muted-foreground border-t border-border no-print">
         <p>Steno Exam Evaluator • Supports Hindi (हिंदी) and English</p>
       </footer>
     </div>
