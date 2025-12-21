@@ -4,37 +4,40 @@ import type { DiffResult } from '@/utils/diffAlgorithm';
 
 interface ResultDisplayProps {
   results: DiffResult[];
+  useKrutiDev: boolean;
 }
 
-const ResultDisplay = ({ results }: ResultDisplayProps) => {
+const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
   if (results.length === 0) {
     return null;
   }
 
   return (
-    <Card className="shadow-elevated border-border bg-card" id="result-section">
-      <CardHeader className="pb-3">
+    <Card className="shadow-elevated border-border bg-card print:shadow-none print:border-none" id="result-section">
+      <CardHeader className="pb-3 no-print">
         <CardTitle className="flex items-center gap-2 text-lg">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           Comparison Result
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="result-container p-6 bg-white border border-border rounded-lg text-base leading-relaxed">
+        <div 
+          className={`result-container p-6 bg-white border border-border rounded-lg text-base leading-relaxed print:border-none print:p-0 ${useKrutiDev ? 'font-kruti-dev text-xl' : ''}`}
+        >
           {results.map((result, index) => {
             switch (result.type) {
               case 'correct':
                 return (
-                  <span key={index} className="text-black">
+                  <span key={index} className="text-foreground">
                     {result.typed}{' '}
                   </span>
                 );
               case 'error':
                 return (
                   <span key={index}>
-                    <span className="text-red-600">{result.typed}</span>
+                    <span className="text-error italic underline decoration-dotted decoration-error">{result.typed}</span>
                     <span className="bracket-arial">[</span>
-                    <span className="text-green-700 font-bold">{result.correct}</span>
+                    <span className="text-correct font-bold">{result.correct}</span>
                     <span className="bracket-arial">]</span>{' '}
                   </span>
                 );
@@ -42,13 +45,13 @@ const ResultDisplay = ({ results }: ResultDisplayProps) => {
                 return (
                   <span key={index}>
                     <span className="bracket-arial">[</span>
-                    <span className="text-green-700 font-bold">{result.correct}</span>
+                    <span className="text-correct font-bold">{result.correct}</span>
                     <span className="bracket-arial">]</span>{' '}
                   </span>
                 );
               case 'extra':
                 return (
-                  <span key={index} className="text-red-600 line-through">
+                  <span key={index} className="text-error line-through">
                     {result.typed}{' '}
                   </span>
                 );
@@ -59,14 +62,14 @@ const ResultDisplay = ({ results }: ResultDisplayProps) => {
         </div>
         <div className="mt-4 flex flex-wrap gap-6 text-sm no-print">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-1 rounded text-black border border-border">Word</span>
+            <span className="px-2 py-1 rounded text-foreground border border-border">Word</span>
             <span className="text-muted-foreground">= Correct</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 rounded">
-              <span className="text-red-600">wrong</span>
+              <span className="text-error italic underline decoration-dotted decoration-error">wrong</span>
               <span className="bracket-arial">[</span>
-              <span className="text-green-700 font-bold">right</span>
+              <span className="text-correct font-bold">right</span>
               <span className="bracket-arial">]</span>
             </span>
             <span className="text-muted-foreground">= Error</span>
@@ -74,13 +77,13 @@ const ResultDisplay = ({ results }: ResultDisplayProps) => {
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 rounded">
               <span className="bracket-arial">[</span>
-              <span className="text-green-700 font-bold">missing</span>
+              <span className="text-correct font-bold">missing</span>
               <span className="bracket-arial">]</span>
             </span>
             <span className="text-muted-foreground">= Missing</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-1 rounded text-red-600 line-through">extra</span>
+            <span className="px-2 py-1 rounded text-error line-through">extra</span>
             <span className="text-muted-foreground">= Extra</span>
           </div>
         </div>

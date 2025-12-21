@@ -1,19 +1,34 @@
-import { useState } from 'react';
-import { Play, RotateCcw, BookOpen, Keyboard, Printer } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Play, RotateCcw, Printer, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import Header from '@/components/Header';
 import TextPanel from '@/components/TextPanel';
-import Dashboard from '@/components/Dashboard';
+import ExamHeader from '@/components/ExamHeader';
+import ScoringDashboard from '@/components/ScoringDashboard';
 import ResultDisplay from '@/components/ResultDisplay';
 import { analyzeText, type DiffResult, type AnalysisStats } from '@/utils/diffAlgorithm';
 import { useToast } from '@/hooks/use-toast';
+import { BookOpen, Keyboard } from 'lucide-react';
 
 const Index = () => {
   const [masterText, setMasterText] = useState('');
   const [typedText, setTypedText] = useState('');
   const [results, setResults] = useState<DiffResult[]>([]);
   const [stats, setStats] = useState<AnalysisStats | null>(null);
+  const [useKrutiDev, setUseKrutiDev] = useState(false);
+  const [studentName, setStudentName] = useState('');
+  const [testNumber, setTestNumber] = useState('');
+  const [examDate, setExamDate] = useState('');
   const { toast } = useToast();
+
+  // Auto-fill date on mount
+  useEffect(() => {
+    const now = new Date();
+    const localDateTime = now.toISOString().slice(0, 16);
+    setExamDate(localDateTime);
+  }, []);
 
   const handleAnalyze = () => {
     if (!masterText.trim()) {
@@ -64,8 +79,15 @@ const Index = () => {
       <Header />
       
       <main className="flex-1 container mx-auto px-4 py-6 space-y-6">
-        {/* Dashboard at Top */}
-        <Dashboard stats={stats} />
+        {/* Exam Header */}
+        <ExamHeader
+          studentName={studentName}
+          testNumber={testNumber}
+          examDate={examDate}
+          onStudentNameChange={setStudentName}
+          onTestNumberChange={setTestNumber}
+          onExamDateChange={setExamDate}
+        />
 
         {/* Text Panels */}
         <div className="grid md:grid-cols-2 gap-6 no-print">
@@ -86,7 +108,7 @@ const Index = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center no-print">
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center no-print">
           <Button size="lg" onClick={handleAnalyze} className="min-w-[180px]">
             <Play className="w-5 h-5" />
             Analyze
@@ -101,8 +123,26 @@ const Index = () => {
           </Button>
         </div>
 
+        {/* Kruti Dev Toggle */}
+        {results.length > 0 && (
+          <div className="flex items-center justify-center gap-3 no-print">
+            <Type className="w-5 h-5 text-primary" />
+            <Label htmlFor="kruti-toggle" className="font-medium cursor-pointer">
+              Switch to Kruti Dev View
+            </Label>
+            <Switch
+              id="kruti-toggle"
+              checked={useKrutiDev}
+              onCheckedChange={setUseKrutiDev}
+            />
+          </div>
+        )}
+
+        {/* Scoring Dashboard */}
+        <ScoringDashboard stats={stats} isVisible={results.length > 0} />
+
         {/* Results */}
-        <ResultDisplay results={results} />
+        <ResultDisplay results={results} useKrutiDev={useKrutiDev} />
       </main>
 
       {/* Footer */}
