@@ -1,6 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Kruti Dev 010 font - requires local installation */
+@font-face {
+  font-family: 'Kruti Dev 010';
+  src: local('Kruti Dev 010'), local('KrutiDev010'), local('Kruti Dev');
+  font-weight: normal;
+  font-style: normal;
+}
 
 @layer base {
   :root {
@@ -34,59 +44,61 @@
     --extra: 0 84% 50%;
   }
 
-  .dark {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 210 100% 45%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 20% 96%;
-    --secondary-foreground: 0 0% 10%;
-    --muted: 210 15% 95%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 210 40% 94%;
-    --accent-foreground: 0 0% 10%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 210 20% 90%;
-    --input: 210 20% 90%;
-    --ring: 210 100% 45%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
+  }
+}
+
+@layer components {
+  .text-error {
+    color: hsl(var(--error));
+  }
+  
+  .text-correct {
+    color: hsl(var(--correct));
+    @apply font-bold;
+  }
+  
+  .text-extra {
+    color: hsl(var(--error));
+    @apply line-through;
+  }
+  
+  .text-missing {
+    color: hsl(var(--correct));
+    @apply font-bold;
+  }
+
+  .font-kruti-dev {
+    font-family: 'Kruti Dev 010', sans-serif !important;
   }
 }
 
 @layer utilities {
-  .text-error {
-    @apply text-red-600;
+  .bracket-arial {
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-weight: normal !important;
   }
-  .text-correct {
-    @apply text-green-700 font-bold;
-  }
-  .text-missing {
-    @apply text-green-700 font-bold;
-  }
-  .text-extra {
-    @apply text-red-600 line-through;
-  }
+
   .shadow-card {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
+  
   .shadow-elevated {
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
   }
-  .bracket-arial {
-    font-family: Arial, sans-serif !important;
+
+  .gradient-header {
+    background: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(217 91% 40%) 100%);
+  }
+
+  .decoration-error {
+    text-decoration-color: hsl(var(--error));
   }
 }
 
@@ -94,60 +106,19 @@
   .no-print {
     display: none !important;
   }
-  .print-only {
+  
+  .print\\:block {
     display: block !important;
   }
+  
   body {
     background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+  
   .result-container {
-    border: 1px solid #ccc !important;
-    padding: 20px !important;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
-  }
-}
-
-@layer components {
-  .text-error {
-    @apply text-destructive font-medium;
-  }
-  
-  .text-correct {
-    color: hsl(var(--success));
-    @apply font-semibold;
-  }
-  
-  .text-extra {
-    color: hsl(var(--info));
-    @apply line-through;
-  }
-  
-  .text-missing {
-    color: hsl(var(--success));
-    @apply font-bold;
-  }
-}
-
-@layer utilities {
-  .gradient-header {
-    background: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(217 91% 40%) 100%);
-  }
-  
-  .shadow-soft {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-  }
-  
-  .shadow-elevated {
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    border: none !important;
+    padding: 0 !important;
   }
 }

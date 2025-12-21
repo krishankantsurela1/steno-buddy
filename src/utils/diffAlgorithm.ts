@@ -11,17 +11,30 @@ export interface AnalysisStats {
   accuracy: number;
 }
 
+// Normalize text for accurate comparison
+function normalizeText(text: string): string {
+  // Unicode normalization for Hindi characters
+  let normalized = text.normalize('NFC');
+  // Replace multiple spaces with single space
+  normalized = normalized.replace(/\s+/g, ' ');
+  // Trim whitespace
+  return normalized.trim();
+}
+
 // Tokenize text while preserving Hindi punctuation as separate tokens
 function tokenize(text: string): string[] {
-  // Split by whitespace first
-  const rawTokens = text.trim().split(/\s+/).filter(t => t.length > 0);
+  // Normalize text first
+  const normalizedText = normalizeText(text);
+  
+  // Split by whitespace
+  const rawTokens = normalizedText.split(' ').filter(t => t.length > 0);
   const tokens: string[] = [];
   
   for (const token of rawTokens) {
     // Handle Hindi Purn Viram (।) and other punctuation as separate tokens
     let current = '';
     for (const char of token) {
-      if (char === '।' || char === ',' || char === '.' || char === '?' || char === '!') {
+      if (char === '।' || char === ',' || char === '.' || char === '?' || char === '!' || char === ';' || char === ':') {
         if (current) {
           tokens.push(current);
           current = '';
