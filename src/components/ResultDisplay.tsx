@@ -12,39 +12,43 @@ const ResultDisplay = ({ results }: ResultDisplayProps) => {
   }
 
   return (
-    <Card className="shadow-elevated border-border bg-card animate-fade-in">
+    <Card className="shadow-elevated border-border bg-card" id="result-section">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
-          <CheckCircle2 className="w-5 h-5 text-success" />
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
           Comparison Result
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="p-4 bg-secondary/30 rounded-lg text-base leading-loose whitespace-pre-wrap">
+        <div className="result-container p-6 bg-white border border-border rounded-lg text-base leading-relaxed">
           {results.map((result, index) => {
             switch (result.type) {
               case 'correct':
                 return (
-                  <span key={index} className="text-foreground">
+                  <span key={index} className="text-black">
                     {result.typed}{' '}
                   </span>
                 );
               case 'error':
                 return (
                   <span key={index}>
-                    <span className="text-error">{result.typed}</span>
-                    <span className="text-correct">({result.correct})</span>{' '}
+                    <span className="text-red-600">{result.typed}</span>
+                    <span className="bracket-arial">[</span>
+                    <span className="text-green-700 font-bold">{result.correct}</span>
+                    <span className="bracket-arial">]</span>{' '}
                   </span>
                 );
               case 'missing':
                 return (
-                  <span key={index} className="text-missing">
-                    {result.correct}{' '}
+                  <span key={index}>
+                    <span className="bracket-arial">[</span>
+                    <span className="text-green-700 font-bold">{result.correct}</span>
+                    <span className="bracket-arial">]</span>{' '}
                   </span>
                 );
               case 'extra':
                 return (
-                  <span key={index} className="text-extra">
+                  <span key={index} className="text-red-600 line-through">
                     {result.typed}{' '}
                   </span>
                 );
@@ -53,22 +57,31 @@ const ResultDisplay = ({ results }: ResultDisplayProps) => {
             }
           })}
         </div>
-        <div className="mt-4 flex flex-wrap gap-4 text-sm">
+        <div className="mt-4 flex flex-wrap gap-6 text-sm no-print">
           <div className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-foreground"></span>
-            <span className="text-muted-foreground">Correct</span>
+            <span className="px-2 py-1 rounded text-black border border-border">Word</span>
+            <span className="text-muted-foreground">= Correct</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-destructive"></span>
-            <span className="text-muted-foreground">Error (with correction)</span>
+            <span className="px-2 py-1 rounded">
+              <span className="text-red-600">wrong</span>
+              <span className="bracket-arial">[</span>
+              <span className="text-green-700 font-bold">right</span>
+              <span className="bracket-arial">]</span>
+            </span>
+            <span className="text-muted-foreground">= Error</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-success"></span>
-            <span className="text-muted-foreground">Missing</span>
+            <span className="px-2 py-1 rounded">
+              <span className="bracket-arial">[</span>
+              <span className="text-green-700 font-bold">missing</span>
+              <span className="bracket-arial">]</span>
+            </span>
+            <span className="text-muted-foreground">= Missing</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-4 h-4 rounded bg-info"></span>
-            <span className="text-muted-foreground">Extra (strikethrough)</span>
+            <span className="px-2 py-1 rounded text-red-600 line-through">extra</span>
+            <span className="text-muted-foreground">= Extra</span>
           </div>
         </div>
       </CardContent>
