@@ -45,6 +45,7 @@ const Index = () => {
   const [results, setResults] = useState<DiffResult[]>([]);
   const [stats, setStats] = useState<AnalysisStats | null>(null);
   const [useKrutiDev, setUseKrutiDev] = useState(false);
+  const [useKrutiDevInput, setUseKrutiDevInput] = useState(false);
   const [studentName, setStudentName] = useState('');
   const [testNumber, setTestNumber] = useState('');
   const [examDate, setExamDate] = useState('');
@@ -134,6 +135,19 @@ const Index = () => {
           onExamDateChange={setExamDate}
         />
 
+        {/* Input Font Toggle */}
+        <div className="flex items-center justify-center gap-3 no-print">
+          <Type className="w-5 h-5 text-primary" />
+          <Label htmlFor="kruti-input-toggle" className="font-medium cursor-pointer bracket-arial">
+            Kruti Dev Input Mode
+          </Label>
+          <Switch
+            id="kruti-input-toggle"
+            checked={useKrutiDevInput}
+            onCheckedChange={setUseKrutiDevInput}
+          />
+        </div>
+
         {/* Text Panels */}
         <div className="grid md:grid-cols-2 gap-6 no-print">
           <TextPanel
@@ -142,6 +156,7 @@ const Index = () => {
             value={masterText}
             onChange={setMasterText}
             icon={<BookOpen className="w-5 h-5 text-primary" />}
+            useKrutiDev={useKrutiDevInput}
           />
           <TextPanel
             label="Student Typed Text"
@@ -149,6 +164,7 @@ const Index = () => {
             value={typedText}
             onChange={setTypedText}
             icon={<Keyboard className="w-5 h-5 text-primary" />}
+            useKrutiDev={useKrutiDevInput}
           />
         </div>
 
