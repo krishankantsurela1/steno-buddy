@@ -101,14 +101,66 @@ const Index = () => {
     window.print();
   };
 
-  const handleCopyResult = () => {
-    const resultElement = document.getElementById('result-text');
-    if (resultElement) {
-      const text = resultElement.innerText;
+  const generateRichHTML = (): string => {
+    const fontFamily = useKrutiDev ? "'Kruti Dev 010', Arial, sans-serif" : "Arial, sans-serif";
+    const arialStyle = "font-family: Arial, sans-serif;";
+    
+    let html = `<div style="font-family: ${fontFamily}; font-size: 14pt; line-height: 1.6;">`;
+    
+    results.forEach((result) => {
+      switch (result.type) {
+        case 'correct':
+          html += `<span style="color: black;">${result.typed}</span><span style="${arialStyle}"> </span>`;
+          break;
+        case 'error':
+          html += `<span style="color: #dc2626; font-style: italic; text-decoration: underline; text-decoration-style: dotted;">${result.typed}</span>`;
+          html += `<span style="${arialStyle}"> [</span>`;
+          html += `<span style="color: #16a34a; font-weight: bold;">${result.correct}</span>`;
+          html += `<span style="${arialStyle}">] </span>`;
+          break;
+        case 'missing':
+          html += `<span style="${arialStyle}">[</span>`;
+          html += `<span style="color: #16a34a; font-weight: bold;">${result.correct}</span>`;
+          html += `<span style="${arialStyle}">] </span>`;
+          break;
+        case 'extra':
+          html += `<span style="color: #dc2626; text-decoration: line-through;">${result.typed}</span><span style="${arialStyle}"> </span>`;
+          break;
+      }
+    });
+    
+    html += '</div>';
+    return html;
+  };
+
+  const handleCopyResult = async () => {
+    if (results.length === 0) return;
+    
+    try {
+      const htmlContent = generateRichHTML();
+      const plainText = document.getElementById('result-text')?.innerText || '';
+      
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const textBlob = new Blob([plainText], { type: 'text/plain' });
+      
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': htmlBlob,
+          'text/plain': textBlob,
+        }),
+      ]);
+      
+      toast({
+        title: 'Copied!',
+        description: 'Rich text copied. Paste into MS Word to preserve formatting.',
+      });
+    } catch (error) {
+      // Fallback to plain text
+      const text = document.getElementById('result-text')?.innerText || '';
       navigator.clipboard.writeText(text).then(() => {
         toast({
           title: 'Copied!',
-          description: 'Result text copied to clipboard.',
+          description: 'Plain text copied (rich copy not supported in this browser).',
         });
       }).catch(() => {
         toast({
