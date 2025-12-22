@@ -52,22 +52,23 @@ const ExamHeader = ({
         <div className="space-y-2">
           <Label htmlFor="examDate" className="flex items-center gap-2 text-sm font-medium">
             <Calendar className="w-4 h-4 text-primary" />
-            Date & Time
+            Date & Time (IST)
           </Label>
           <Input
             id="examDate"
-            type="datetime-local"
+            type="text"
             value={examDate}
             onChange={(e) => onExamDateChange(e.target.value)}
             className="bg-background"
+            placeholder="DD/MM/YYYY | HH:MM AM/PM"
           />
         </div>
       </div>
 
       {/* Print-only header display */}
       <div className="hidden print:block mb-4 p-4 border-b-2 border-foreground">
-        <h1 className="text-2xl font-bold text-center mb-4">Steno Performance Report</h1>
-        <div className="grid grid-cols-3 gap-4 text-sm">
+        <h1 className="text-2xl font-bold text-center mb-4 bracket-arial">Steno Performance Report</h1>
+        <div className="grid grid-cols-3 gap-4 text-sm bracket-arial">
           <div>
             <span className="font-semibold">Student Name:</span> {studentName || '_______________'}
           </div>
@@ -75,7 +76,7 @@ const ExamHeader = ({
             <span className="font-semibold">Test Number:</span> {testNumber || '_______________'}
           </div>
           <div>
-            <span className="font-semibold">Date:</span> {examDate ? new Date(examDate).toLocaleString() : '_______________'}
+            <span className="font-semibold">Date & Time:</span> {examDate || '_______________'}
           </div>
         </div>
       </div>
