@@ -13,12 +13,19 @@ export interface AnalysisStats {
 
 // Normalize text for accurate comparison
 function normalizeText(text: string): string {
-  // Unicode normalization for Hindi characters
+  // Unicode normalization for Hindi characters - NFC ensures matras are combined with letters
   let normalized = text.normalize('NFC');
   // Replace multiple spaces with single space
   normalized = normalized.replace(/\s+/g, ' ');
   // Trim whitespace
   return normalized.trim();
+}
+
+// Tokenize text into whole words only - no character splitting
+function tokenizeWholeWords(text: string): string[] {
+  const normalizedText = normalizeText(text);
+  // Split by whitespace only, keeping whole words intact
+  return normalizedText.split(' ').filter(t => t.length > 0);
 }
 
 // Tokenize text while preserving Hindi punctuation as separate tokens
@@ -90,8 +97,9 @@ function backtrackLCS(dp: number[][], a: string[], b: string[], i: number, j: nu
 }
 
 export function analyzeText(masterText: string, typedText: string): { results: DiffResult[], stats: AnalysisStats } {
-  const masterTokens = tokenize(masterText);
-  const typedTokens = tokenize(typedText);
+  // Use whole word tokenization to prevent word splitting
+  const masterTokens = tokenizeWholeWords(masterText);
+  const typedTokens = tokenizeWholeWords(typedText);
   
   if (masterTokens.length === 0 && typedTokens.length === 0) {
     return {
