@@ -67,7 +67,8 @@ const ExamHeader = ({
 
       {/* Print-only header display */}
       <div className="hidden print:block mb-4 p-4 border-b-2 border-foreground">
-        <h1 className="text-2xl font-bold text-center mb-4 bracket-arial">Steno Performance Report</h1>
+        <p className="text-xs text-center mb-1 bracket-arial">Developed by [Krishan Kant Surela]</p>
+        <h1 className="text-2xl font-bold text-center mb-4 bracket-arial">[Surela Steno Accuracy Checker] Steno Evaluator</h1>
         <div className="grid grid-cols-3 gap-4 text-sm bracket-arial">
           <div>
             <span className="font-semibold">Student Name:</span> {studentName || '_______________'}
