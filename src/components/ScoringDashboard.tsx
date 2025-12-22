@@ -15,43 +15,34 @@ const ScoringDashboard = ({ stats, isVisible }: ScoringDashboardProps) => {
   const correctWords = stats.totalMasterWords - stats.errors;
   const totalMarks = Math.max(0, Math.round(correctWords * 0.5 * 100) / 100); // 0.5 marks per correct word
 
-  const rows = [
-    { label: 'Total Words in Master Text', value: stats.totalMasterWords },
-    { label: 'Total Words Typed', value: stats.totalTypedWords },
+  const items = [
+    { label: 'Total Master Words', value: stats.totalMasterWords },
+    { label: 'Typed Words', value: stats.totalTypedWords },
     { label: 'Correct Words', value: correctWords },
-    { label: 'Total Mistakes (Full + Half)', value: stats.errors },
-    { label: 'Accuracy Percentage', value: `${stats.accuracy}%` },
+    { label: 'Total Errors (Full + Half)', value: stats.errors },
+    { label: 'Accuracy', value: `${stats.accuracy}%` },
     { label: 'Total Marks', value: totalMarks },
   ];
 
   return (
-    <Card className="shadow-elevated border-border bg-card print:shadow-none print:border-2 print:border-foreground">
+    <Card className="shadow-elevated border-border bg-card print:shadow-none print:border-none">
       <CardHeader className="pb-3 print:pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex items-center gap-2 text-lg bracket-arial">
           <BarChart3 className="w-5 h-5 text-primary no-print" />
           Scoring Dashboard
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-muted print:bg-gray-200">
-                <th className="text-left px-4 py-2 border border-border font-semibold">Metric</th>
-                <th className="text-right px-4 py-2 border border-border font-semibold">Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={index} className={index % 2 === 0 ? 'bg-background' : 'bg-muted/50'}>
-                  <td className="px-4 py-2 border border-border">{row.label}</td>
-                  <td className="px-4 py-2 border border-border text-right font-mono font-semibold">
-                    {row.value}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap gap-4 justify-center bracket-arial">
+          {items.map((item, index) => (
+            <div 
+              key={index} 
+              className="flex flex-col items-center px-4 py-3 bg-muted/50 rounded-lg min-w-[120px] print:bg-transparent print:border print:border-foreground"
+            >
+              <span className="text-xs text-muted-foreground text-center print:text-foreground">{item.label}</span>
+              <span className="text-xl font-bold text-foreground">{item.value}</span>
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

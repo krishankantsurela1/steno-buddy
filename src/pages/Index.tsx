@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Printer, Type } from 'lucide-react';
+import { Play, RotateCcw, Printer, Type, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,33 @@ import { analyzeText, type DiffResult, type AnalysisStats } from '@/utils/diffAl
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, Keyboard } from 'lucide-react';
 
+// Format date to IST: DD/MM/YYYY | HH:MM AM/PM
+const formatISTDateTime = (): string => {
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: 'Asia/Kolkata',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  };
+  
+  const formatter = new Intl.DateTimeFormat('en-IN', options);
+  const parts = formatter.formatToParts(new Date());
+  
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+  
+  const day = get('day');
+  const month = get('month');
+  const year = get('year');
+  const hour = get('hour');
+  const minute = get('minute');
+  const dayPeriod = get('dayPeriod').toUpperCase();
+  
+  return `${day}/${month}/${year} | ${hour}:${minute} ${dayPeriod}`;
+};
+
 const Index = () => {
   const [masterText, setMasterText] = useState('');
   const [typedText, setTypedText] = useState('');
@@ -23,11 +50,9 @@ const Index = () => {
   const [examDate, setExamDate] = useState('');
   const { toast } = useToast();
 
-  // Auto-fill date on mount
+  // Auto-fill date on mount with IST
   useEffect(() => {
-    const now = new Date();
-    const localDateTime = now.toISOString().slice(0, 16);
-    setExamDate(localDateTime);
+    setExamDate(formatISTDateTime());
   }, []);
 
   const handleAnalyze = () => {
@@ -64,6 +89,7 @@ const Index = () => {
     setTypedText('');
     setResults([]);
     setStats(null);
+    setExamDate(formatISTDateTime());
     toast({
       title: 'Reset Complete',
       description: 'All fields have been cleared.',
@@ -72,6 +98,25 @@ const Index = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleCopyResult = () => {
+    const resultElement = document.getElementById('result-text');
+    if (resultElement) {
+      const text = resultElement.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        toast({
+          title: 'Copied!',
+          description: 'Result text copied to clipboard.',
+        });
+      }).catch(() => {
+        toast({
+          title: 'Copy Failed',
+          description: 'Could not copy to clipboard.',
+          variant: 'destructive',
+        });
+      });
+    }
   };
 
   return (
@@ -113,6 +158,10 @@ const Index = () => {
             <Play className="w-5 h-5" />
             Analyze
           </Button>
+          <Button size="lg" variant="outline" onClick={handleCopyResult} className="min-w-[180px]" disabled={results.length === 0}>
+            <Copy className="w-5 h-5" />
+            Copy Result
+          </Button>
           <Button size="lg" variant="outline" onClick={handlePrint} className="min-w-[180px]" disabled={results.length === 0}>
             <Printer className="w-5 h-5" />
             Print
@@ -127,7 +176,7 @@ const Index = () => {
         {results.length > 0 && (
           <div className="flex items-center justify-center gap-3 no-print">
             <Type className="w-5 h-5 text-primary" />
-            <Label htmlFor="kruti-toggle" className="font-medium cursor-pointer">
+            <Label htmlFor="kruti-toggle" className="font-medium cursor-pointer bracket-arial">
               Switch to Kruti Dev View
             </Label>
             <Switch

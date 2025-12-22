@@ -15,30 +15,32 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
   return (
     <Card className="shadow-elevated border-border bg-card print:shadow-none print:border-none" id="result-section">
       <CardHeader className="pb-3 no-print">
-        <CardTitle className="flex items-center gap-2 text-lg">
+        <CardTitle className="flex items-center gap-2 text-lg bracket-arial">
           <CheckCircle2 className="w-5 h-5 text-green-600" />
           Comparison Result
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div 
-          className={`result-container p-6 bg-white border border-border rounded-lg text-base leading-relaxed print:border-none print:p-0 ${useKrutiDev ? 'font-kruti-dev text-xl' : ''}`}
+          id="result-text"
+          className={`result-container p-6 bg-white rounded-lg text-base leading-relaxed print:p-0 ${useKrutiDev ? 'font-kruti-dev text-xl' : ''}`}
         >
           {results.map((result, index) => {
             switch (result.type) {
               case 'correct':
                 return (
                   <span key={index} className="text-foreground">
-                    {result.typed}{' '}
+                    {result.typed}
+                    <span className="bracket-arial"> </span>
                   </span>
                 );
               case 'error':
                 return (
                   <span key={index}>
                     <span className="text-error italic underline decoration-dotted decoration-error">{result.typed}</span>
-                    <span className="bracket-arial">[</span>
+                    <span className="bracket-arial"> [</span>
                     <span className="text-correct font-bold">{result.correct}</span>
-                    <span className="bracket-arial">]</span>{' '}
+                    <span className="bracket-arial">] </span>
                   </span>
                 );
               case 'missing':
@@ -46,13 +48,14 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
                   <span key={index}>
                     <span className="bracket-arial">[</span>
                     <span className="text-correct font-bold">{result.correct}</span>
-                    <span className="bracket-arial">]</span>{' '}
+                    <span className="bracket-arial">] </span>
                   </span>
                 );
               case 'extra':
                 return (
                   <span key={index} className="text-error line-through">
-                    {result.typed}{' '}
+                    {result.typed}
+                    <span className="bracket-arial"> </span>
                   </span>
                 );
               default:
@@ -60,7 +63,7 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
             }
           })}
         </div>
-        <div className="mt-4 flex flex-wrap gap-6 text-sm no-print">
+        <div className="mt-4 flex flex-wrap gap-6 text-sm no-print bracket-arial">
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 rounded text-foreground border border-border">Word</span>
             <span className="text-muted-foreground">= Correct</span>
@@ -68,7 +71,7 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 rounded">
               <span className="text-error italic underline decoration-dotted decoration-error">wrong</span>
-              <span className="bracket-arial">[</span>
+              <span className="bracket-arial"> [</span>
               <span className="text-correct font-bold">right</span>
               <span className="bracket-arial">]</span>
             </span>
