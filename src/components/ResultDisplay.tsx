@@ -43,6 +43,15 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
                     <span className="bracket-arial">] </span>
                   </span>
                 );
+              case 'half-error':
+                return (
+                  <span key={index}>
+                    <span className="text-yellow-600 italic underline decoration-wavy decoration-yellow-600">{result.typed || '∅'}</span>
+                    <span className="bracket-arial"> [</span>
+                    <span className="text-correct font-bold">{result.correct || '∅'}</span>
+                    <span className="bracket-arial">] </span>
+                  </span>
+                );
               case 'missing':
                 return (
                   <span key={index}>
@@ -75,7 +84,16 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
               <span className="text-correct font-bold">right</span>
               <span className="bracket-arial">]</span>
             </span>
-            <span className="text-muted-foreground">= Error</span>
+            <span className="text-muted-foreground">= Full Mistake (1.0)</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2 py-1 rounded">
+              <span className="text-yellow-600 italic underline decoration-wavy decoration-yellow-600">punct</span>
+              <span className="bracket-arial"> [</span>
+              <span className="text-correct font-bold">punct।</span>
+              <span className="bracket-arial">]</span>
+            </span>
+            <span className="text-muted-foreground">= Half Mistake (0.5)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 rounded">
@@ -83,11 +101,11 @@ const ResultDisplay = ({ results, useKrutiDev }: ResultDisplayProps) => {
               <span className="text-correct font-bold">missing</span>
               <span className="bracket-arial">]</span>
             </span>
-            <span className="text-muted-foreground">= Missing</span>
+            <span className="text-muted-foreground">= Missing (1.0)</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-2 py-1 rounded text-error line-through">extra</span>
-            <span className="text-muted-foreground">= Extra</span>
+            <span className="text-muted-foreground">= Extra (1.0)</span>
           </div>
         </div>
       </CardContent>

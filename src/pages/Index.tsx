@@ -8,6 +8,7 @@ import TextPanel from '@/components/TextPanel';
 import ExamHeader from '@/components/ExamHeader';
 import ScoringDashboard from '@/components/ScoringDashboard';
 import ResultDisplay from '@/components/ResultDisplay';
+import LoginScreen from '@/components/LoginScreen';
 import { analyzeText, type DiffResult, type AnalysisStats } from '@/utils/diffAlgorithm';
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, Keyboard } from 'lucide-react';
@@ -40,6 +41,7 @@ const formatISTDateTime = (): string => {
 };
 
 const Index = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [masterText, setMasterText] = useState('');
   const [typedText, setTypedText] = useState('');
   const [results, setResults] = useState<DiffResult[]>([]);
@@ -81,7 +83,7 @@ const Index = () => {
 
     toast({
       title: 'Analysis Complete',
-      description: `Found ${analysis.stats.errors} error(s) with ${analysis.stats.accuracy}% accuracy.`,
+      description: `Score: ${analysis.stats.marks}/100 (${analysis.stats.fullMistakes} full + ${analysis.stats.halfMistakes} half mistakes)`,
     });
   };
 
@@ -116,6 +118,12 @@ const Index = () => {
           html += `<span style="color: #dc2626; font-style: italic; text-decoration: underline; text-decoration-style: dotted;">${result.typed}</span>`;
           html += `<span style="${arialStyle}"> [</span>`;
           html += `<span style="color: #16a34a; font-weight: bold;">${result.correct}</span>`;
+          html += `<span style="${arialStyle}">] </span>`;
+          break;
+        case 'half-error':
+          html += `<span style="color: #ca8a04; font-style: italic; text-decoration: underline; text-decoration-style: wavy;">${result.typed || '∅'}</span>`;
+          html += `<span style="${arialStyle}"> [</span>`;
+          html += `<span style="color: #16a34a; font-weight: bold;">${result.correct || '∅'}</span>`;
           html += `<span style="${arialStyle}">] </span>`;
           break;
         case 'missing':
@@ -171,6 +179,10 @@ const Index = () => {
       });
     }
   };
+
+  if (!isLoggedIn) {
+    return <LoginScreen onLogin={() => setIsLoggedIn(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

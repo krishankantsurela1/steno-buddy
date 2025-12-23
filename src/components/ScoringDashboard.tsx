@@ -12,16 +12,13 @@ const ScoringDashboard = ({ stats, isVisible }: ScoringDashboardProps) => {
     return null;
   }
 
-  const correctWords = stats.totalMasterWords - stats.errors;
-  const totalMarks = Math.max(0, Math.round(correctWords * 0.5 * 100) / 100); // 0.5 marks per correct word
-
   const items = [
-    { label: 'Total Master Words', value: stats.totalMasterWords },
+    { label: 'Total Words (Original)', value: stats.totalMasterWords },
     { label: 'Typed Words', value: stats.totalTypedWords },
-    { label: 'Correct Words', value: correctWords },
-    { label: 'Total Errors (Full + Half)', value: stats.errors },
-    { label: 'Accuracy', value: `${stats.accuracy}%` },
-    { label: 'Total Marks', value: totalMarks },
+    { label: 'Full Mistakes (1.0)', value: stats.fullMistakes, highlight: 'error' },
+    { label: 'Half Mistakes (0.5)', value: stats.halfMistakes, highlight: 'warning' },
+    { label: 'Total Penalty', value: stats.totalPenalty },
+    { label: 'Marks (out of 100)', value: stats.marks, highlight: 'success' },
   ];
 
   return (
@@ -37,10 +34,18 @@ const ScoringDashboard = ({ stats, isVisible }: ScoringDashboardProps) => {
           {items.map((item, index) => (
             <div 
               key={index} 
-              className="flex flex-col items-center px-4 py-3 bg-muted/50 rounded-lg min-w-[120px] print:bg-transparent print:border print:border-foreground"
+              className={`flex flex-col items-center px-4 py-3 rounded-lg min-w-[120px] print:bg-transparent print:border print:border-foreground ${
+                item.highlight === 'error' ? 'bg-red-100' : 
+                item.highlight === 'warning' ? 'bg-yellow-100' : 
+                item.highlight === 'success' ? 'bg-green-100' : 'bg-muted/50'
+              }`}
             >
               <span className="text-xs text-muted-foreground text-center print:text-foreground">{item.label}</span>
-              <span className="text-xl font-bold text-foreground">{item.value}</span>
+              <span className={`text-xl font-bold ${
+                item.highlight === 'error' ? 'text-red-600' : 
+                item.highlight === 'warning' ? 'text-yellow-600' : 
+                item.highlight === 'success' ? 'text-green-600' : 'text-foreground'
+              }`}>{item.value}</span>
             </div>
           ))}
         </div>

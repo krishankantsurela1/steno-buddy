@@ -21,8 +21,8 @@ const Dashboard = ({ stats }: DashboardProps) => {
       color: 'text-primary',
     },
     {
-      label: 'Total Errors',
-      value: stats?.errors ?? '-',
+      label: 'Total Penalty',
+      value: stats?.totalPenalty ?? '-',
       icon: <AlertTriangle className="w-5 h-5" />,
       color: 'text-red-600',
     },

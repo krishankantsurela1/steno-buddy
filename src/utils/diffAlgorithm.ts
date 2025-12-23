@@ -1,5 +1,5 @@
 export interface DiffResult {
-  type: 'correct' | 'error' | 'missing' | 'extra';
+  type: 'correct' | 'error' | 'missing' | 'extra' | 'half-error';
   typed?: string;
   correct?: string;
 }
@@ -7,7 +7,10 @@ export interface DiffResult {
 export interface AnalysisStats {
   totalMasterWords: number;
   totalTypedWords: number;
-  errors: number;
+  fullMistakes: number;
+  halfMistakes: number;
+  totalPenalty: number;
+  marks: number;
   accuracy: number;
 }
 
@@ -96,6 +99,37 @@ function backtrackLCS(dp: number[][], a: string[], b: string[], i: number, j: nu
   return result;
 }
 
+// Check if token is a punctuation mark that counts as half mistake
+function isHalfMistakePunctuation(token: string): boolean {
+  return token === ',' || token === '-' || token === '।';
+}
+
+// Check if two tokens differ only by punctuation (half mistake)
+function isPunctuationOnlyDifference(typed: string, master: string): boolean {
+  // Remove punctuation from both and compare
+  const punctuationChars = [',', '-', '।'];
+  let cleanTyped = typed;
+  let cleanMaster = master;
+  
+  for (const p of punctuationChars) {
+    cleanTyped = cleanTyped.replace(new RegExp(`\\${p}`, 'g'), '');
+    cleanMaster = cleanMaster.replace(new RegExp(`\\${p}`, 'g'), '');
+  }
+  
+  // If the words are the same without punctuation, it's a punctuation difference
+  if (cleanTyped === cleanMaster && cleanTyped.length > 0) {
+    return true;
+  }
+  
+  // Check if one is just punctuation added/removed
+  const hasPunctuationDiff = punctuationChars.some(p => 
+    (typed.includes(p) && !master.includes(p)) || 
+    (!typed.includes(p) && master.includes(p))
+  );
+  
+  return hasPunctuationDiff && cleanTyped === cleanMaster;
+}
+
 export function analyzeText(masterText: string, typedText: string): { results: DiffResult[], stats: AnalysisStats } {
   // Use whole word tokenization to prevent word splitting
   const masterTokens = tokenizeWholeWords(masterText);
@@ -104,7 +138,7 @@ export function analyzeText(masterText: string, typedText: string): { results: D
   if (masterTokens.length === 0 && typedTokens.length === 0) {
     return {
       results: [],
-      stats: { totalMasterWords: 0, totalTypedWords: 0, errors: 0, accuracy: 100 }
+      stats: { totalMasterWords: 0, totalTypedWords: 0, fullMistakes: 0, halfMistakes: 0, totalPenalty: 0, marks: 100, accuracy: 100 }
     };
   }
   
@@ -112,7 +146,8 @@ export function analyzeText(masterText: string, typedText: string): { results: D
   const matches = backtrackLCS(dp, masterTokens, typedTokens, masterTokens.length, typedTokens.length);
   
   const results: DiffResult[] = [];
-  let errors = 0;
+  let fullMistakes = 0;
+  let halfMistakes = 0;
   
   let masterIdx = 0;
   let typedIdx = 0;
@@ -133,52 +168,97 @@ export function analyzeText(masterText: string, typedText: string): { results: D
       const typedNeedsAdvance = typedIdx < currentMatch[1];
       
       if (masterNeedsAdvance && typedNeedsAdvance) {
-        // Both have unmatched tokens - this is an error (typed wrong)
-        results.push({ 
-          type: 'error', 
-          typed: typedTokens[typedIdx], 
-          correct: masterTokens[masterIdx] 
-        });
-        errors++;
+        // Both have unmatched tokens - check if it's punctuation difference
+        if (isPunctuationOnlyDifference(typedTokens[typedIdx], masterTokens[masterIdx])) {
+          results.push({ 
+            type: 'half-error', 
+            typed: typedTokens[typedIdx], 
+            correct: masterTokens[masterIdx] 
+          });
+          halfMistakes++;
+        } else {
+          results.push({ 
+            type: 'error', 
+            typed: typedTokens[typedIdx], 
+            correct: masterTokens[masterIdx] 
+          });
+          fullMistakes++;
+        }
         masterIdx++;
         typedIdx++;
       } else if (masterNeedsAdvance) {
-        // Missing word from typed text
-        results.push({ type: 'missing', correct: masterTokens[masterIdx] });
-        errors++;
+        // Missing word - check if it's just punctuation
+        if (isHalfMistakePunctuation(masterTokens[masterIdx])) {
+          results.push({ type: 'half-error', correct: masterTokens[masterIdx] });
+          halfMistakes++;
+        } else {
+          results.push({ type: 'missing', correct: masterTokens[masterIdx] });
+          fullMistakes++;
+        }
         masterIdx++;
       } else if (typedNeedsAdvance) {
-        // Extra word in typed text
-        results.push({ type: 'extra', typed: typedTokens[typedIdx] });
-        errors++;
+        // Extra word - check if it's just punctuation
+        if (isHalfMistakePunctuation(typedTokens[typedIdx])) {
+          results.push({ type: 'half-error', typed: typedTokens[typedIdx] });
+          halfMistakes++;
+        } else {
+          results.push({ type: 'extra', typed: typedTokens[typedIdx] });
+          fullMistakes++;
+        }
         typedIdx++;
       }
     } else {
       // No more matches - handle remaining tokens
       if (masterIdx < masterTokens.length && typedIdx < typedTokens.length) {
-        results.push({ 
-          type: 'error', 
-          typed: typedTokens[typedIdx], 
-          correct: masterTokens[masterIdx] 
-        });
-        errors++;
+        if (isPunctuationOnlyDifference(typedTokens[typedIdx], masterTokens[masterIdx])) {
+          results.push({ 
+            type: 'half-error', 
+            typed: typedTokens[typedIdx], 
+            correct: masterTokens[masterIdx] 
+          });
+          halfMistakes++;
+        } else {
+          results.push({ 
+            type: 'error', 
+            typed: typedTokens[typedIdx], 
+            correct: masterTokens[masterIdx] 
+          });
+          fullMistakes++;
+        }
         masterIdx++;
         typedIdx++;
       } else if (masterIdx < masterTokens.length) {
-        results.push({ type: 'missing', correct: masterTokens[masterIdx] });
-        errors++;
+        if (isHalfMistakePunctuation(masterTokens[masterIdx])) {
+          results.push({ type: 'half-error', correct: masterTokens[masterIdx] });
+          halfMistakes++;
+        } else {
+          results.push({ type: 'missing', correct: masterTokens[masterIdx] });
+          fullMistakes++;
+        }
         masterIdx++;
       } else if (typedIdx < typedTokens.length) {
-        results.push({ type: 'extra', typed: typedTokens[typedIdx] });
-        errors++;
+        if (isHalfMistakePunctuation(typedTokens[typedIdx])) {
+          results.push({ type: 'half-error', typed: typedTokens[typedIdx] });
+          halfMistakes++;
+        } else {
+          results.push({ type: 'extra', typed: typedTokens[typedIdx] });
+          fullMistakes++;
+        }
         typedIdx++;
       }
     }
   }
   
   const totalMasterWords = masterTokens.length;
+  const totalPenalty = fullMistakes * 1.0 + halfMistakes * 0.5;
+  
+  // Formula: Marks = 100 - ((Total Penalties / Total Words in Original) * 100)
+  const marks = totalMasterWords > 0 
+    ? Math.max(0, Math.round((100 - (totalPenalty / totalMasterWords) * 100) * 100) / 100)
+    : 100;
+  
   const accuracy = totalMasterWords > 0 
-    ? Math.max(0, Math.round(((totalMasterWords - errors) / totalMasterWords) * 100 * 100) / 100)
+    ? Math.max(0, Math.round(((totalMasterWords - totalPenalty) / totalMasterWords) * 100 * 100) / 100)
     : 100;
   
   return {
@@ -186,7 +266,10 @@ export function analyzeText(masterText: string, typedText: string): { results: D
     stats: {
       totalMasterWords,
       totalTypedWords: typedTokens.length,
-      errors,
+      fullMistakes,
+      halfMistakes,
+      totalPenalty,
+      marks,
       accuracy
     }
   };
