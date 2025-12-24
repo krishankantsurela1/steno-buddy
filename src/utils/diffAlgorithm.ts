@@ -1,3 +1,5 @@
+import { areKrutidevEquivalent, normalizeForKrutidev } from './krutidevEquivalences';
+
 export interface DiffResult {
   type: 'correct' | 'error' | 'missing' | 'extra' | 'half-error';
   typed?: string;
@@ -12,6 +14,17 @@ export interface AnalysisStats {
   totalPenalty: number;
   marks: number;
   accuracy: number;
+}
+
+// Flag to enable/disable Krutidev smart comparison
+let krutidevComparisonEnabled = true;
+
+export function setKrutidevComparisonEnabled(enabled: boolean): void {
+  krutidevComparisonEnabled = enabled;
+}
+
+export function isKrutidevComparisonEnabled(): boolean {
+  return krutidevComparisonEnabled;
 }
 
 // Normalize text for accurate comparison
@@ -62,7 +75,20 @@ function tokenize(text: string): string[] {
   return tokens;
 }
 
-// LCS-based diff algorithm for better alignment
+// Compare two words with Krutidev smart matching
+function areWordsEqual(word1: string, word2: string): boolean {
+  // Direct match first
+  if (word1 === word2) return true;
+  
+  // If Krutidev comparison is enabled, use smart matching
+  if (krutidevComparisonEnabled) {
+    return areKrutidevEquivalent(word1, word2);
+  }
+  
+  return false;
+}
+
+// LCS-based diff algorithm for better alignment (with Krutidev support)
 function lcs(a: string[], b: string[]): number[][] {
   const m = a.length;
   const n = b.length;
@@ -70,7 +96,7 @@ function lcs(a: string[], b: string[]): number[][] {
   
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      if (a[i - 1] === b[j - 1]) {
+      if (areWordsEqual(a[i - 1], b[j - 1])) {
         dp[i][j] = dp[i - 1][j - 1] + 1;
       } else {
         dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
@@ -85,7 +111,7 @@ function backtrackLCS(dp: number[][], a: string[], b: string[], i: number, j: nu
   const result: Array<[number, number]> = [];
   
   while (i > 0 && j > 0) {
-    if (a[i - 1] === b[j - 1]) {
+    if (areWordsEqual(a[i - 1], b[j - 1])) {
       result.unshift([i - 1, j - 1]);
       i--;
       j--;
@@ -119,6 +145,15 @@ function isPunctuationOnlyDifference(typed: string, master: string): boolean {
   // If the words are the same without punctuation, it's a punctuation difference
   if (cleanTyped === cleanMaster && cleanTyped.length > 0) {
     return true;
+  }
+  
+  // Also check with Krutidev normalization
+  if (krutidevComparisonEnabled) {
+    const normTyped = normalizeForKrutidev(cleanTyped);
+    const normMaster = normalizeForKrutidev(cleanMaster);
+    if (normTyped === normMaster && normTyped.length > 0) {
+      return true;
+    }
   }
   
   // Check if one is just punctuation added/removed
@@ -157,7 +192,7 @@ export function analyzeText(masterText: string, typedText: string): { results: D
     const currentMatch = matchIdx < matches.length ? matches[matchIdx] : null;
     
     if (currentMatch && masterIdx === currentMatch[0] && typedIdx === currentMatch[1]) {
-      // Perfect match
+      // Perfect match (including Krutidev equivalents)
       results.push({ type: 'correct', typed: typedTokens[typedIdx] });
       masterIdx++;
       typedIdx++;
@@ -168,7 +203,14 @@ export function analyzeText(masterText: string, typedText: string): { results: D
       const typedNeedsAdvance = typedIdx < currentMatch[1];
       
       if (masterNeedsAdvance && typedNeedsAdvance) {
-        // Both have unmatched tokens - check if it's punctuation difference
+        // Both have unmatched tokens - check if it's Krutidev equivalent or punctuation difference
+        if (areWordsEqual(typedTokens[typedIdx], masterTokens[masterIdx])) {
+          results.push({ type: 'correct', typed: typedTokens[typedIdx] });
+          masterIdx++;
+          typedIdx++;
+          continue;
+        }
+        
         if (isPunctuationOnlyDifference(typedTokens[typedIdx], masterTokens[masterIdx])) {
           results.push({ 
             type: 'half-error', 
@@ -210,6 +252,14 @@ export function analyzeText(masterText: string, typedText: string): { results: D
     } else {
       // No more matches - handle remaining tokens
       if (masterIdx < masterTokens.length && typedIdx < typedTokens.length) {
+        // Check Krutidev equivalence first
+        if (areWordsEqual(typedTokens[typedIdx], masterTokens[masterIdx])) {
+          results.push({ type: 'correct', typed: typedTokens[typedIdx] });
+          masterIdx++;
+          typedIdx++;
+          continue;
+        }
+        
         if (isPunctuationOnlyDifference(typedTokens[typedIdx], masterTokens[masterIdx])) {
           results.push({ 
             type: 'half-error', 
