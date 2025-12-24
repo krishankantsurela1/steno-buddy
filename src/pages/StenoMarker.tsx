@@ -106,7 +106,7 @@ const StenoMarker = () => {
           // Check for full minute marker (every WPM words)
           if (wordCount % wpm === 0) {
             minuteCount++;
-            const minuteMarker = `"@@${minuteCount}@@"`;
+            const minuteMarker = `@@${minuteCount}@@`;
             resultElements.push(
               <span key={globalKey++} className="bg-green-400 text-green-900 font-bold px-1 mx-1 rounded">
                 {minuteMarker}
@@ -213,7 +213,7 @@ const StenoMarker = () => {
 
           if (wordCount % wpm === 0) {
             minuteCount++;
-            html += ` <span style="background-color: #4ade80; color: #14532d; font-weight: bold; padding: 2px 4px; border-radius: 3px;">"@@${minuteCount}@@"</span>`;
+            html += ` <span style="background-color: #4ade80; color: #14532d; font-weight: bold; padding: 2px 4px; border-radius: 3px;">@@${minuteCount}@@</span>`;
           } else if (wordCount % interval === 0) {
             html += ` <span style="background-color: #fde047; color: #713f12; padding: 2px 4px; border-radius: 3px;">@@</span>`;
           }
@@ -399,7 +399,7 @@ const StenoMarker = () => {
                 = 15-second interval
               </span>
               <span className="flex items-center gap-1">
-                <span className="bg-green-400 text-green-900 font-bold px-1 rounded">"@@1@@"</span>
+                <span className="bg-green-400 text-green-900 font-bold px-1 rounded">@@1@@</span>
                 = Minute marker
               </span>
             </div>
