@@ -1,28 +1,17 @@
 import { useState, useEffect } from 'react';
-import { Play, RotateCcw, Printer, Type, Copy, Settings, Shield } from 'lucide-react';
+import { Play, RotateCcw, Printer, Type, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import Header from '@/components/Header';
 import TextPanel from '@/components/TextPanel';
 import ExamHeader from '@/components/ExamHeader';
 import ScoringDashboard from '@/components/ScoringDashboard';
 import ResultDisplay from '@/components/ResultDisplay';
 import LoginScreen from '@/components/LoginScreen';
-import { analyzeText, type DiffResult, type AnalysisStats, setKrutidevComparisonEnabled, isKrutidevComparisonEnabled } from '@/utils/diffAlgorithm';
+import { analyzeText, type DiffResult, type AnalysisStats } from '@/utils/diffAlgorithm';
 import { useToast } from '@/hooks/use-toast';
 import { BookOpen, Keyboard } from 'lucide-react';
-
-const MASTER_PASSWORD = '68194934';
 
 // Format date to IST: DD/MM/YYYY | HH:MM AM/PM
 const formatISTDateTime = (): string => {
@@ -62,21 +51,12 @@ const Index = () => {
   const [studentName, setStudentName] = useState('');
   const [testNumber, setTestNumber] = useState('');
   const [examDate, setExamDate] = useState('');
-  const [smartComparisonEnabled, setSmartComparisonEnabled] = useState(true);
-  const [settingsPassword, setSettingsPassword] = useState('');
-  const [isSettingsUnlocked, setIsSettingsUnlocked] = useState(false);
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Auto-fill date on mount with IST
   useEffect(() => {
     setExamDate(formatISTDateTime());
   }, []);
-
-  // Sync smart comparison state with the algorithm
-  useEffect(() => {
-    setKrutidevComparisonEnabled(smartComparisonEnabled);
-  }, [smartComparisonEnabled]);
 
   const handleAnalyze = () => {
     if (!masterText.trim()) {
@@ -270,113 +250,6 @@ const Index = () => {
             <RotateCcw className="w-5 h-5" />
             Reset
           </Button>
-          
-          {/* Smart Comparison Settings */}
-          <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" variant="outline" className="min-w-[180px]">
-                <Settings className="w-5 h-5" />
-                Smart Comparison
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-primary" />
-                  Krutidev Smart Comparison Settings
-                </DialogTitle>
-                <DialogDescription>
-                  Advanced settings for Hindi Krutidev font comparison. Password protected.
-                </DialogDescription>
-              </DialogHeader>
-              
-              {!isSettingsUnlocked ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="settings-password">Master Password</Label>
-                    <Input
-                      id="settings-password"
-                      type="password"
-                      placeholder="Enter master password..."
-                      value={settingsPassword}
-                      onChange={(e) => setSettingsPassword(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && settingsPassword === MASTER_PASSWORD) {
-                          setIsSettingsUnlocked(true);
-                          setSettingsPassword('');
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button 
-                    className="w-full"
-                    onClick={() => {
-                      if (settingsPassword === MASTER_PASSWORD) {
-                        setIsSettingsUnlocked(true);
-                        setSettingsPassword('');
-                      } else {
-                        toast({
-                          title: 'Invalid Password',
-                          description: 'Please enter the correct master password.',
-                          variant: 'destructive',
-                        });
-                      }
-                    }}
-                  >
-                    Unlock Settings
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Smart Comparison Toggle */}
-                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border">
-                    <div className="space-y-1">
-                      <Label htmlFor="smart-comparison" className="font-semibold">
-                        Smart Visual Comparison
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        Enable intelligent matching for Krutidev variations
-                      </p>
-                    </div>
-                    <Switch
-                      id="smart-comparison"
-                      checked={smartComparisonEnabled}
-                      onCheckedChange={setSmartComparisonEnabled}
-                    />
-                  </div>
-                  
-                  {/* Feature List */}
-                  <div className="space-y-3 text-sm">
-                    <p className="font-semibold text-primary">When enabled, the following are treated as CORRECT:</p>
-                    <ul className="space-y-2 text-muted-foreground">
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">✓</span>
-                        <span><strong>Alt-Code Bypass:</strong> क्त, द्द, त्त, द्ध, द्य, द्व, क्र, त्र, श्र, प्र etc. match their split forms</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">✓</span>
-                        <span><strong>Nasal Sounds:</strong> सम्बन्ध = संबंध, बन्दूक = बंदूक</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">✓</span>
-                        <span><strong>Chandra-bindu:</strong> पहुँच = पहुंच, माँ = मां</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <span className="text-green-500 mt-0.5">✓</span>
-                        <span><strong>Nukta Neutrality:</strong> Ignores ़ in all comparisons</span>
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div className={`p-3 rounded-lg text-center font-medium ${smartComparisonEnabled ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {smartComparisonEnabled 
-                      ? '✓ Smart Comparison is ACTIVE' 
-                      : '⚠ Smart Comparison is DISABLED'}
-                  </div>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
 
         {/* Kruti Dev Toggle */}
