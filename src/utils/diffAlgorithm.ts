@@ -14,10 +14,52 @@ export interface AnalysisStats {
   accuracy: number;
 }
 
+// Universal Character Map for Kruti Dev Smart Visual Comparison
+const universalCharMap: Record<string, string> = {
+  // --- Special Character Expansions (From User Data) ---
+  "ä": "Dr",       // Example: O;fä -> O;fDr (Universal Rule)
+  "Ñ": "d`",       // Example: izÑfr -> izd`fr (Kri -> Ka + Backtick)
+  "Ø": "dz",       // Example: izfØ;k -> izfdz;k (Kra -> Ka + Ra)
+  "Ù": "Rr",       // Example: ...fÙk -> ...fRr (Tta -> Ta + Ta)
+  
+  // --- Visual Bypasses (Common Student Substitutions) ---
+  // These keys look similar in Kruti Dev, so we allow them interchangeably
+  "U": "a",        // Example: cUnwd -> canwd (Half Na visual match)
+  "E": "a",        // Example: lEcU/k -> laca/k
+  "i": "a",        // Example: igqip -> igqap
+  "j": "a",        // Example: ekj -> eka
+  ".": "a",        // Example: n.M -> naM
+  
+  // --- Standard Legacy Bypasses ---
+  "˜": "n~n",      // The (Dda)
+  "™": "n~`",      // Dha
+  "š": "n~o",      // Dva
+  "¶": "Q~",       // Ffa
+  "Ì": "n~nk"      // Dda variation
+};
+
+// Apply Kruti Dev character normalization
+function normalizeKrutiDevChars(inputText: string): string {
+  if (!inputText) return "";
+  let cleanText = inputText;
+  
+  // Iterate through the map and replace ALL occurrences globally
+  Object.entries(universalCharMap).forEach(([specialChar, replacement]) => {
+    // Escape special regex chars like . or ?
+    const escapedKey = specialChar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedKey, 'g');
+    cleanText = cleanText.replace(regex, replacement);
+  });
+  
+  return cleanText;
+}
+
 // Normalize text for accurate comparison
 function normalizeText(text: string): string {
+  // Apply Kruti Dev character normalization first
+  let normalized = normalizeKrutiDevChars(text);
   // Unicode normalization for Hindi characters - NFC ensures matras are combined with letters
-  let normalized = text.normalize('NFC');
+  normalized = normalized.normalize('NFC');
   // Replace multiple spaces with single space
   normalized = normalized.replace(/\s+/g, ' ');
   // Trim whitespace
