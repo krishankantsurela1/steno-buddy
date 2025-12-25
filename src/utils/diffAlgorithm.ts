@@ -13,51 +13,48 @@ export interface AnalysisStats {
   marks: number;
   accuracy: number;
 }
-
-// Universal Character Map for Kruti Dev Smart Visual Comparison
-const universalCharMap: Record<string, string> = {
-  // --- Special Character Expansions (From User Data) ---
-  "ä": "Dr",       // Example: O;fä -> O;fDr (Universal Rule)
-  "Ñ": "d`",       // Example: izÑfr -> izd`fr (Kri -> Ka + Backtick)
-  "Ø": "dz",       // Example: izfØ;k -> izfdz;k (Kra -> Ka + Ra)
-  "Ù": "Rr",       // Example: ...fÙk -> ...fRr (Tta -> Ta + Ta)
-  
-  // --- Visual Bypasses (Common Student Substitutions) ---
-  // These keys look similar in Kruti Dev, so we allow them interchangeably
-  "U": "a",        // Example: cUnwd -> canwd (Half Na visual match)
-  "E": "a",        // Example: lEcU/k -> laca/k
-  "i": "a",        // Example: igqip -> igqap
-  "j": "a",        // Example: ekj -> eka
-  ".": "a",        // Example: n.M -> naM
-  
-  // --- Standard Legacy Bypasses ---
-  "˜": "n~n",      // The (Dda)
+// Normalization Map for Kruti Dev Smart Visual Comparison
+export const NORMALIZATION_MAP: Record<string, string> = {
+  // --- Mandatory Rules (from User Data) ---
+  "ä": "Dr",       // Alt+0228 -> Dr
+  "Ñ": "d`",       // Alt+0209 -> d + backtick
+  "Ø": "dz",       // Alt+0216 -> d + z
+  "Ù": "Rr",       // Alt+0217 -> R + r
+  "˜": "n~n",      // Dda
   "™": "n~`",      // Dha
   "š": "n~o",      // Dva
   "¶": "Q~",       // Ffa
-  "Ì": "n~nk"      // Dda variation
+  "Ì": "n~nk",     // Dda variation
+  
+  // --- Visual/Common Mistake Bypasses ---
+  "U": "a", "E": "a", "i": "a", "j": "a", ".": "a"
 };
 
-// Apply Kruti Dev character normalization
-function normalizeKrutiDevChars(inputText: string): string {
-  if (!inputText) return "";
-  let cleanText = inputText;
+// Check if two words match after normalization
+export const checkWordMatch = (original: string, typed: string): boolean => {
+  if (!original || !typed) return false;
   
-  // Iterate through the map and replace ALL occurrences globally
-  Object.entries(universalCharMap).forEach(([specialChar, replacement]) => {
-    // Escape special regex chars like . or ?
-    const escapedKey = specialChar.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(escapedKey, 'g');
-    cleanText = cleanText.replace(regex, replacement);
-  });
+  const normalize = (text: string): string => {
+    let clean = text;
+    Object.entries(NORMALIZATION_MAP).forEach(([key, val]) => {
+      // Escape special regex characters
+      const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+      clean = clean.replace(regex, val);
+    });
+    return clean;
+  };
   
-  return cleanText;
-}
+  return normalize(original) === normalize(typed);
+};
 
 // Normalize text for accurate comparison
 function normalizeText(text: string): string {
   // Apply Kruti Dev character normalization first
-  let normalized = normalizeKrutiDevChars(text);
+  let normalized = text;
+  Object.entries(NORMALIZATION_MAP).forEach(([key, val]) => {
+    const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    normalized = normalized.replace(regex, val);
+  });
   // Unicode normalization for Hindi characters - NFC ensures matras are combined with letters
   normalized = normalized.normalize('NFC');
   // Replace multiple spaces with single space
