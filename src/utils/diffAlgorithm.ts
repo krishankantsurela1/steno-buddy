@@ -13,50 +13,11 @@ export interface AnalysisStats {
   marks: number;
   accuracy: number;
 }
-// Normalization Map for Kruti Dev Smart Visual Comparison
-export const NORMALIZATION_MAP: Record<string, string> = {
-  // --- Mandatory Rules (from User Data) ---
-  "ä": "Dr",       // Alt+0228 -> Dr
-  "Ñ": "d`",       // Alt+0209 -> d + backtick
-  "Ø": "dz",       // Alt+0216 -> d + z
-  "Ù": "Rr",       // Alt+0217 -> R + r
-  "˜": "n~n",      // Dda
-  "™": "n~`",      // Dha
-  "š": "n~o",      // Dva
-  "¶": "Q~",       // Ffa
-  "Ì": "n~nk",     // Dda variation
-  
-  // --- Visual/Common Mistake Bypasses ---
-  "U": "a", "E": "a", "i": "a", "j": "a", ".": "a"
-};
-
-// Check if two words match after normalization
-export const checkWordMatch = (original: string, typed: string): boolean => {
-  if (!original || !typed) return false;
-  
-  const normalize = (text: string): string => {
-    let clean = text;
-    Object.entries(NORMALIZATION_MAP).forEach(([key, val]) => {
-      // Escape special regex characters
-      const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-      clean = clean.replace(regex, val);
-    });
-    return clean;
-  };
-  
-  return normalize(original) === normalize(typed);
-};
 
 // Normalize text for accurate comparison
 function normalizeText(text: string): string {
-  // Apply Kruti Dev character normalization first
-  let normalized = text;
-  Object.entries(NORMALIZATION_MAP).forEach(([key, val]) => {
-    const regex = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-    normalized = normalized.replace(regex, val);
-  });
   // Unicode normalization for Hindi characters - NFC ensures matras are combined with letters
-  normalized = normalized.normalize('NFC');
+  let normalized = text.normalize('NFC');
   // Replace multiple spaces with single space
   normalized = normalized.replace(/\s+/g, ' ');
   // Trim whitespace
