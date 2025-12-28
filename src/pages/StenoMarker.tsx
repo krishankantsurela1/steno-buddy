@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, ArrowLeft, Copy, Play, Lock, Eraser } from 'lucide-react';
+import { FileText, ArrowLeft, Copy, Play, Lock, Eraser, Undo2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const CORRECT_PASSWORD = '68194934';
@@ -20,6 +20,7 @@ const StenoMarker = () => {
   const [wpm, setWpm] = useState<number>(80);
   const [fontType, setFontType] = useState<'system' | 'kruti'>('system');
   const [markedText, setMarkedText] = useState<React.ReactNode[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
   const { toast } = useToast();
 
   const handleLogin = (e: React.FormEvent) => {
@@ -33,6 +34,30 @@ const StenoMarker = () => {
     }
   };
 
+  const saveToHistory = useCallback(() => {
+    setHistory(prev => [...prev, dictationText]);
+  }, [dictationText]);
+
+  const undo = () => {
+    if (history.length === 0) {
+      toast({
+        title: "No History",
+        description: "No previous state to restore.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const previousState = history[history.length - 1];
+    setHistory(prev => prev.slice(0, -1));
+    setDictationText(previousState);
+    setMarkedText([]);
+    toast({
+      title: "Undo Successful",
+      description: "Restored to previous state.",
+    });
+  };
+
   const removeMarkers = () => {
     if (!dictationText.trim()) {
       toast({
@@ -43,14 +68,20 @@ const StenoMarker = () => {
       return;
     }
 
-    // Remove only markers: // \d+ // and // patterns
+    // Save current state to history before removing markers
+    saveToHistory();
+
+    // Remove only markers: @@\d+@@ and @@ patterns while preserving paragraphs
     let cleanedText = dictationText
       .replace(/@@\d+@@/g, '') // Remove minute markers like @@1@@, @@2@@
       .replace(/@@/g, '')      // Remove interval markers @@
-      .replace(/\s\s+/g, ' ')  // Clean up double spaces
-      .trim();
+      .replace(/\s\s+/g, ' ')  // Clean up double spaces (but not newlines)
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n');
 
     setDictationText(cleanedText);
+    setMarkedText([]);
     toast({
       title: "Markers Removed",
       description: "All markers have been removed from the input.",
@@ -76,7 +107,13 @@ const StenoMarker = () => {
       return;
     }
 
-    // Calculate interval (words per 15 seconds) - robust calculation
+    // Save current state to history before processing
+    saveToHistory();
+
+    // FIXED: Accurate interval calculation
+    // Quarter marker appears every (WPM / 4) words
+    // For 70 WPM: interval = Math.floor(70 / 4) = 17 words
+    // For 80 WPM: interval = Math.floor(80 / 4) = 20 words
     const wordsPerMinute = wpm;
     const interval = Math.floor(wordsPerMinute / 4);
     
@@ -98,15 +135,13 @@ const StenoMarker = () => {
       let wordCount = 0;
       let minuteCount = 0;
 
-      paragraphs.forEach((paragraph, paraIndex) => {
+      paragraphs.forEach((paragraph) => {
         const paragraphContent: React.ReactNode[] = [];
         
         // Get words from paragraph, preserving structure
         const words = paragraph.split(/\s+/).filter(word => word.length > 0);
         
         words.forEach((word, wordIndex) => {
-          wordCount++;
-
           // Add space before word (except first word in paragraph)
           if (wordIndex > 0) {
             paragraphContent.push(<span key={globalKey++}> </span>);
@@ -115,18 +150,22 @@ const StenoMarker = () => {
           // Add the word
           paragraphContent.push(<span key={globalKey++}>{word}</span>);
 
+          // Increment word count AFTER adding the word
+          wordCount++;
+
+          // FIXED: Check for markers only when wordCount is a multiple of the interval
           // Check for full minute marker (every WPM words)
-          if (wordCount % wordsPerMinute === 0) {
+          if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
             minuteCount++;
             const minuteMarker = `@@${minuteCount}@@`;
             paragraphContent.push(
-              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: '#90EE90' }}>
+              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: '#00FF00' }}>
                 {minuteMarker}
               </sup>
             );
           }
           // Check for interval marker (every interval words, but not if it's also a minute marker)
-          else if (interval > 0 && wordCount % interval === 0) {
+          else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
             paragraphContent.push(
               <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: 'yellow' }}>
                 @@
@@ -148,7 +187,7 @@ const StenoMarker = () => {
 
     toast({
       title: "Text Processed",
-      description: `Marked text with interval markers at ${wpm} WPM.`
+      description: `Marked text with interval every ${interval} words at ${wpm} WPM.`
     });
   };
 
@@ -213,18 +252,17 @@ const StenoMarker = () => {
         const words = paragraph.split(/\s+/).filter(word => word.length > 0);
         
         words.forEach((word, wordIndex) => {
-          wordCount++;
-
           if (wordIndex > 0) {
             text += ' ';
           }
 
           text += word;
+          wordCount++;
 
-          if (wordCount % wordsPerMinute === 0) {
+          if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
             minuteCount++;
             text += ` @@${minuteCount}@@`;
-          } else if (interval > 0 && wordCount % interval === 0) {
+          } else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
             text += ' @@';
           }
         });
@@ -262,21 +300,20 @@ const StenoMarker = () => {
           html += '&nbsp;';
         } else {
           words.forEach((word, wordIndex) => {
-            wordCount++;
-
             if (wordIndex > 0) {
               html += ' ';
             }
 
             html += word;
+            wordCount++;
 
-            // Minute marker - GREEN highlight
-            if (wordCount % wordsPerMinute === 0) {
+            // Minute marker - BRIGHT GREEN highlight (#00FF00)
+            if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
               minuteCount++;
-              html += ` <sup style="font-weight: bold; background-color: #90EE90; mso-highlight: green; vertical-align: super; font-size: smaller;">@@${minuteCount}@@</sup>`;
+              html += ` <sup style="font-weight: bold; background-color: #00FF00; mso-highlight: green; vertical-align: super; font-size: smaller;">@@${minuteCount}@@</sup>`;
             } 
             // Interval marker - YELLOW highlight
-            else if (interval > 0 && wordCount % interval === 0) {
+            else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
               html += ` <sup style="font-weight: bold; background-color: yellow; mso-highlight: yellow; vertical-align: super; font-size: smaller;">@@</sup>`;
             }
           });
@@ -414,6 +451,9 @@ const StenoMarker = () => {
                 <Play className="w-4 h-4 mr-2" />
                 Process
               </Button>
+              <Button onClick={undo} variant="outline" title="Undo last action" disabled={history.length === 0}>
+                <Undo2 className="w-4 h-4" />
+              </Button>
               <Button onClick={removeMarkers} variant="outline" title="Remove markers from input">
                 <Eraser className="w-4 h-4" />
               </Button>
@@ -467,7 +507,7 @@ const StenoMarker = () => {
                 = 15-second interval
               </span>
               <span className="flex items-center gap-1">
-                <sup className="font-bold px-1" style={{ backgroundColor: '#90EE90' }}>@@1@@</sup>
+                <sup className="font-bold px-1" style={{ backgroundColor: '#00FF00' }}>@@1@@</sup>
                 = Minute marker
               </span>
             </div>
