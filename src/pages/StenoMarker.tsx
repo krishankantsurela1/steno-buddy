@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, ArrowLeft, Copy, Play, Lock } from 'lucide-react';
+import { FileText, ArrowLeft, Copy, Play, Lock, Eraser } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const CORRECT_PASSWORD = '68194934';
@@ -33,6 +33,30 @@ const StenoMarker = () => {
     }
   };
 
+  const removeMarkers = () => {
+    if (!dictationText.trim()) {
+      toast({
+        title: "No Text",
+        description: "Please enter dictation matter first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Remove only markers: // \d+ // and // patterns
+    let cleanedText = dictationText
+      .replace(/@@\d+@@/g, '') // Remove minute markers like @@1@@, @@2@@
+      .replace(/@@/g, '')      // Remove interval markers @@
+      .replace(/\s\s+/g, ' ')  // Clean up double spaces
+      .trim();
+
+    setDictationText(cleanedText);
+    toast({
+      title: "Markers Removed",
+      description: "All markers have been removed from the input.",
+    });
+  };
+
   const processText = () => {
     if (!dictationText.trim()) {
       toast({
@@ -52,7 +76,9 @@ const StenoMarker = () => {
       return;
     }
 
-    const interval = Math.round(wpm / 4);
+    // Calculate interval (words per 15 seconds) - robust calculation
+    const wordsPerMinute = wpm;
+    const interval = Math.floor(wordsPerMinute / 4);
     
     // Split by '*' to get sections (reset word count for each section)
     const sections = dictationText.split('*');
@@ -90,19 +116,19 @@ const StenoMarker = () => {
           paragraphContent.push(<span key={globalKey++}>{word}</span>);
 
           // Check for full minute marker (every WPM words)
-          if (wordCount % wpm === 0) {
+          if (wordCount % wordsPerMinute === 0) {
             minuteCount++;
             const minuteMarker = `@@${minuteCount}@@`;
             paragraphContent.push(
-              <sup key={globalKey++} className="bg-yellow-300 font-bold px-0.5 mx-0.5 text-xs align-super">
+              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: '#90EE90' }}>
                 {minuteMarker}
               </sup>
             );
           }
           // Check for interval marker (every interval words, but not if it's also a minute marker)
-          else if (wordCount % interval === 0) {
+          else if (interval > 0 && wordCount % interval === 0) {
             paragraphContent.push(
-              <sup key={globalKey++} className="bg-yellow-300 font-bold px-0.5 mx-0.5 text-xs align-super">
+              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: 'yellow' }}>
                 @@
               </sup>
             );
@@ -122,7 +148,7 @@ const StenoMarker = () => {
 
     toast({
       title: "Text Processed",
-      description: `Marked text with interval markers.`
+      description: `Marked text with interval markers at ${wpm} WPM.`
     });
   };
 
@@ -165,7 +191,8 @@ const StenoMarker = () => {
   };
 
   const generatePlainText = (): string => {
-    const interval = Math.round(wpm / 4);
+    const wordsPerMinute = wpm;
+    const interval = Math.floor(wordsPerMinute / 4);
     const sections = dictationText.split('*');
     let text = '';
 
@@ -194,10 +221,10 @@ const StenoMarker = () => {
 
           text += word;
 
-          if (wordCount % wpm === 0) {
+          if (wordCount % wordsPerMinute === 0) {
             minuteCount++;
             text += ` @@${minuteCount}@@`;
-          } else if (wordCount % interval === 0) {
+          } else if (interval > 0 && wordCount % interval === 0) {
             text += ' @@';
           }
         });
@@ -208,7 +235,8 @@ const StenoMarker = () => {
   };
 
   const generateRichHTML = (): string => {
-    const interval = Math.round(wpm / 4);
+    const wordsPerMinute = wpm;
+    const interval = Math.floor(wordsPerMinute / 4);
     const sections = dictationText.split('*');
     const fontFamily = fontType === 'kruti' ? "'Kruti Dev 010', 'Mangal', Arial, sans-serif" : "inherit";
     
@@ -242,10 +270,13 @@ const StenoMarker = () => {
 
             html += word;
 
-            if (wordCount % wpm === 0) {
+            // Minute marker - GREEN highlight
+            if (wordCount % wordsPerMinute === 0) {
               minuteCount++;
-              html += ` <sup style="font-weight: bold; background-color: yellow; mso-highlight: yellow; vertical-align: super; font-size: smaller;">@@${minuteCount}@@</sup>`;
-            } else if (wordCount % interval === 0) {
+              html += ` <sup style="font-weight: bold; background-color: #90EE90; mso-highlight: green; vertical-align: super; font-size: smaller;">@@${minuteCount}@@</sup>`;
+            } 
+            // Interval marker - YELLOW highlight
+            else if (interval > 0 && wordCount % interval === 0) {
               html += ` <sup style="font-weight: bold; background-color: yellow; mso-highlight: yellow; vertical-align: super; font-size: smaller;">@@</sup>`;
             }
           });
@@ -383,6 +414,9 @@ const StenoMarker = () => {
                 <Play className="w-4 h-4 mr-2" />
                 Process
               </Button>
+              <Button onClick={removeMarkers} variant="outline" title="Remove markers from input">
+                <Eraser className="w-4 h-4" />
+              </Button>
               <Button onClick={copyToClipboard} variant="outline" className="flex-1">
                 <Copy className="w-4 h-4 mr-2" />
                 Copy
@@ -429,11 +463,11 @@ const StenoMarker = () => {
             </div>
             <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
-                <sup className="bg-yellow-300 font-bold px-1">@@</sup>
+                <sup className="font-bold px-1" style={{ backgroundColor: 'yellow' }}>@@</sup>
                 = 15-second interval
               </span>
               <span className="flex items-center gap-1">
-                <sup className="bg-yellow-300 font-bold px-1">@@1@@</sup>
+                <sup className="font-bold px-1" style={{ backgroundColor: '#90EE90' }}>@@1@@</sup>
                 = Minute marker
               </span>
             </div>
