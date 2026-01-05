@@ -1,26 +1,43 @@
-import { useState, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, ArrowLeft, Copy, Play, Lock, Eraser, Undo2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Play, ArrowLeft, Upload, PanelLeftClose, PanelLeft, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const CORRECT_PASSWORD = '68194934';
+
+interface TypedWord {
+  text: string;
+  isCorrect: boolean;
+}
 
 const StenoMarker = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   
-  const [dictationText, setDictationText] = useState('');
-  const [wpm, setWpm] = useState<number>(80);
-  const [fontType, setFontType] = useState<'system' | 'kruti'>('system');
-  const [markedText, setMarkedText] = useState<React.ReactNode[]>([]);
-  const [history, setHistory] = useState<string[]>([]);
+  // Setup state
+  const [isSetupMode, setIsSetupMode] = useState(true);
+  const [wordListInput, setWordListInput] = useState('');
+  const [targetRepetitions, setTargetRepetitions] = useState(100);
+  const [customFontName, setCustomFontName] = useState('Kruti Dev 010');
+  const [customFontLoaded, setCustomFontLoaded] = useState(false);
+  
+  // Practice state
+  const [pendingWords, setPendingWords] = useState<string[]>([]);
+  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const [currentScore, setCurrentScore] = useState(0);
+  const [typedWords, setTypedWords] = useState<TypedWord[]>([]);
+  const [typingInput, setTypingInput] = useState('');
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  
+  const typingAreaRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
   const handleLogin = (e: React.FormEvent) => {
@@ -34,330 +51,181 @@ const StenoMarker = () => {
     }
   };
 
-  const saveToHistory = useCallback(() => {
-    setHistory(prev => [...prev, dictationText]);
-  }, [dictationText]);
-
-  const undo = () => {
-    if (history.length === 0) {
-      toast({
-        title: "No History",
-        description: "No previous state to restore.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const previousState = history[history.length - 1];
-    setHistory(prev => prev.slice(0, -1));
-    setDictationText(previousState);
-    setMarkedText([]);
-    toast({
-      title: "Undo Successful",
-      description: "Restored to previous state.",
-    });
-  };
-
-  const removeMarkers = () => {
-    if (!dictationText.trim()) {
-      toast({
-        title: "No Text",
-        description: "Please enter dictation matter first.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Save current state to history before removing markers
-    saveToHistory();
-
-    // Remove only markers: @@\d+@@ and @@ patterns while preserving paragraphs
-    let cleanedText = dictationText
-      .replace(/@@\d+@@/g, '') // Remove minute markers like @@1@@, @@2@@
-      .replace(/@@/g, '')      // Remove interval markers @@
-      .replace(/\s\s+/g, ' ')  // Clean up double spaces (but not newlines)
-      .split('\n')
-      .map(line => line.trim())
-      .join('\n');
-
-    setDictationText(cleanedText);
-    setMarkedText([]);
-    toast({
-      title: "Markers Removed",
-      description: "All markers have been removed from the input.",
-    });
-  };
-
-  const processText = () => {
-    if (!dictationText.trim()) {
-      toast({
-        title: "No Text",
-        description: "Please enter dictation matter first.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (wpm <= 0) {
-      toast({
-        title: "Invalid WPM",
-        description: "Please enter a valid WPM value.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Save current state to history before processing
-    saveToHistory();
-
-    // FIXED: Accurate interval calculation
-    // Quarter marker appears every (WPM / 4) words
-    // For 70 WPM: interval = Math.floor(70 / 4) = 17 words
-    // For 80 WPM: interval = Math.floor(80 / 4) = 20 words
-    const wordsPerMinute = wpm;
-    const interval = Math.floor(wordsPerMinute / 4);
-    
-    // Split by '*' to get sections (reset word count for each section)
-    const sections = dictationText.split('*');
-    const resultElements: React.ReactNode[] = [];
-    let globalKey = 0;
-
-    sections.forEach((section, sectionIndex) => {
-      // Add '*' separator between sections
-      if (sectionIndex > 0) {
-        resultElements.push(
-          <span key={globalKey++} className="text-purple-600 font-bold">*</span>
-        );
-      }
-
-      // Split section by newlines to preserve paragraph structure
-      const paragraphs = section.split('\n');
-      let wordCount = 0;
-      let minuteCount = 0;
-
-      paragraphs.forEach((paragraph) => {
-        const paragraphContent: React.ReactNode[] = [];
-        
-        // Get words from paragraph, preserving structure
-        const words = paragraph.split(/\s+/).filter(word => word.length > 0);
-        
-        words.forEach((word, wordIndex) => {
-          // Add space before word (except first word in paragraph)
-          if (wordIndex > 0) {
-            paragraphContent.push(<span key={globalKey++}> </span>);
-          }
-
-          // Add the word
-          paragraphContent.push(<span key={globalKey++}>{word}</span>);
-
-          // Increment word count AFTER adding the word
-          wordCount++;
-
-          // FIXED: Check for markers only when wordCount is a multiple of the interval
-          // Check for full minute marker (every WPM words)
-          if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
-            minuteCount++;
-            const minuteMarker = `@@${minuteCount}@@`;
-            paragraphContent.push(
-              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: '#00FF00' }}>
-                {minuteMarker}
-              </sup>
-            );
-          }
-          // Check for interval marker (every interval words, but not if it's also a minute marker)
-          else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
-            paragraphContent.push(
-              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: 'yellow' }}>
-                @@
-              </sup>
-            );
-          }
-        });
-
-        // Wrap paragraph content in a p element with margin
-        resultElements.push(
-          <p key={globalKey++} className="mb-3" style={{ marginBottom: '12pt' }}>
-            {paragraphContent.length > 0 ? paragraphContent : <br />}
-          </p>
-        );
-      });
-    });
-
-    setMarkedText(resultElements);
-
-    toast({
-      title: "Text Processed",
-      description: `Marked text with interval every ${interval} words at ${wpm} WPM.`
-    });
-  };
-
-  const copyToClipboard = async () => {
-    if (markedText.length === 0) {
-      toast({
-        title: "No Result",
-        description: "Please process the text first.",
-        variant: "destructive"
-      });
-      return;
-    }
+  // Handle custom font file upload
+  const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     try {
-      // Create rich HTML for clipboard that preserves paragraph breaks and Word formatting
-      const htmlContent = generateRichHTML();
-      const blob = new Blob([htmlContent], { type: 'text/html' });
-
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/html': blob
-        })
-      ]);
-
+      const fontName = file.name.replace(/\.(ttf|otf|woff|woff2)$/i, '');
+      const fontUrl = URL.createObjectURL(file);
+      
+      const fontFace = new FontFace(fontName, `url(${fontUrl})`);
+      const loadedFont = await fontFace.load();
+      document.fonts.add(loadedFont);
+      
+      setCustomFontName(fontName);
+      setCustomFontLoaded(true);
+      
       toast({
-        title: "Copied!",
-        description: "Marked text copied to clipboard with formatting preserved for MS Word.",
-        duration: 2000
+        title: "Font Loaded",
+        description: `"${fontName}" is now active.`,
       });
     } catch (error) {
-      // Fallback - create plain text version
-      const plainText = generatePlainText();
-      await navigator.clipboard.writeText(plainText);
       toast({
-        title: "Copied!",
-        description: "Text copied to clipboard (plain text).",
-        duration: 2000
+        title: "Font Error",
+        description: "Failed to load font file. Please try again.",
+        variant: "destructive"
       });
     }
   };
 
-  const generatePlainText = (): string => {
-    const wordsPerMinute = wpm;
-    const interval = Math.floor(wordsPerMinute / 4);
-    const sections = dictationText.split('*');
-    let text = '';
-
-    sections.forEach((section, sectionIndex) => {
-      if (sectionIndex > 0) {
-        text += '*';
-      }
-
-      const paragraphs = section.split('\n');
-      let wordCount = 0;
-      let minuteCount = 0;
-
-      paragraphs.forEach((paragraph, paraIndex) => {
-        if (paraIndex > 0) {
-          text += '\n\n';
-        }
-
-        const words = paragraph.split(/\s+/).filter(word => word.length > 0);
-        
-        words.forEach((word, wordIndex) => {
-          if (wordIndex > 0) {
-            text += ' ';
-          }
-
-          text += word;
-          wordCount++;
-
-          if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
-            minuteCount++;
-            text += ` @@${minuteCount}@@`;
-          } else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
-            text += ' @@';
-          }
-        });
-      });
-    });
-
-    return text;
-  };
-
-  const generateRichHTML = (): string => {
-    const wordsPerMinute = wpm;
-    const interval = Math.floor(wordsPerMinute / 4);
-    const sections = dictationText.split('*');
-    const fontFamily = fontType === 'kruti' ? "'Kruti Dev 010', 'Mangal', Arial, sans-serif" : "inherit";
+  // Start practice session
+  const startPractice = () => {
+    const words = wordListInput
+      .split(/[\s\n,]+/)
+      .map(w => w.trim())
+      .filter(w => w.length > 0);
     
-    let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
-<head><meta charset="UTF-8"></head>
-<body style="font-family: ${fontFamily}; font-size: 14pt; line-height: 1.6;">`;
-
-    sections.forEach((section, sectionIndex) => {
-      if (sectionIndex > 0) {
-        html += '<span style="color: purple; font-weight: bold;">*</span>';
-      }
-
-      const paragraphs = section.split('\n');
-      let wordCount = 0;
-      let minuteCount = 0;
-
-      paragraphs.forEach((paragraph) => {
-        html += `<p style="margin-bottom: 12pt; font-family: ${fontFamily};">`;
-
-        const words = paragraph.split(/\s+/).filter(word => word.length > 0);
-        
-        if (words.length === 0) {
-          html += '&nbsp;';
-        } else {
-          words.forEach((word, wordIndex) => {
-            if (wordIndex > 0) {
-              html += ' ';
-            }
-
-            html += word;
-            wordCount++;
-
-            // Minute marker - BRIGHT GREEN highlight (#00FF00)
-            if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
-              minuteCount++;
-              html += ` <sup style="font-weight: bold; background-color: #00FF00; mso-highlight: green; vertical-align: super; font-size: smaller;">@@${minuteCount}@@</sup>`;
-            } 
-            // Interval marker - YELLOW highlight
-            else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
-              html += ` <sup style="font-weight: bold; background-color: yellow; mso-highlight: yellow; vertical-align: super; font-size: smaller;">@@</sup>`;
-            }
-          });
-        }
-
-        html += '</p>';
+    if (words.length === 0) {
+      toast({
+        title: "No Words",
+        description: "Please enter at least one word to practice.",
+        variant: "destructive"
       });
-    });
+      return;
+    }
 
-    html += '</body></html>';
-    return html;
+    if (targetRepetitions < 1) {
+      toast({
+        title: "Invalid Target",
+        description: "Target repetitions must be at least 1.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setPendingWords(words);
+    setCurrentWordIndex(0);
+    setCurrentScore(0);
+    setTypedWords([]);
+    setTypingInput('');
+    setIsSetupMode(false);
+
+    toast({
+      title: "Practice Started",
+      description: `Practice ${words.length} word(s), ${targetRepetitions} times each.`,
+    });
   };
 
-  const fontClass = fontType === 'kruti' ? 'font-kruti-dev text-xl' : '';
+  // Handle typing input
+  const handleTypingKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      
+      // Get the last typed word (text after last space)
+      const inputText = typingInput;
+      const lastSpaceIndex = inputText.lastIndexOf(' ');
+      const lastWord = lastSpaceIndex === -1 ? inputText : inputText.slice(lastSpaceIndex + 1);
+      
+      if (lastWord.trim().length === 0) return;
+
+      const currentTargetWord = pendingWords[currentWordIndex];
+      const isCorrect = lastWord.trim() === currentTargetWord;
+
+      // Add the word to typed history
+      setTypedWords(prev => [...prev, { text: lastWord.trim(), isCorrect }]);
+      
+      // Update typing input with space
+      setTypingInput(prev => prev + ' ');
+
+      if (isCorrect) {
+        const newScore = currentScore + 1;
+        setCurrentScore(newScore);
+
+        // Check if target reached
+        if (newScore >= targetRepetitions) {
+          // Move to next word
+          if (currentWordIndex < pendingWords.length - 1) {
+            setCurrentWordIndex(prev => prev + 1);
+            setCurrentScore(0);
+            setTypedWords([]);
+            setTypingInput('');
+            
+            toast({
+              title: "Word Complete!",
+              description: `Moving to next word: "${pendingWords[currentWordIndex + 1]}"`,
+            });
+          } else {
+            // All words complete
+            toast({
+              title: "🎉 Practice Complete!",
+              description: "You have completed all words!",
+            });
+          }
+        }
+      }
+
+      // Auto-scroll
+      setTimeout(() => {
+        if (typingAreaRef.current) {
+          typingAreaRef.current.scrollTop = typingAreaRef.current.scrollHeight;
+        }
+      }, 10);
+    }
+  };
+
+  // Reset current word
+  const resetCurrentWord = () => {
+    setCurrentScore(0);
+    setTypedWords([]);
+    setTypingInput('');
+    inputRef.current?.focus();
+  };
+
+  // Go back to setup
+  const goToSetup = () => {
+    setIsSetupMode(true);
+  };
+
+  // Focus input when practice starts
+  useEffect(() => {
+    if (!isSetupMode && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isSetupMode]);
+
+  // Custom font style
+  const customFontStyle = {
+    fontFamily: customFontLoaded ? `"${customFontName}", "Kruti Dev 010", sans-serif` : `"Kruti Dev 010", sans-serif`
+  };
 
   // Login Screen
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-elevation-medium">
+        <Card className="w-full max-w-md shadow-elevated">
           <CardHeader className="text-center space-y-3">
             <div className="mx-auto p-4 bg-primary/10 rounded-full w-fit">
-              <Lock className="w-10 h-10 text-primary" />
+              <Play className="w-10 h-10 text-primary" />
             </div>
             <CardTitle className="text-2xl font-bold text-foreground">
-              Steno Marker Access
+              Kruti Dev Typing Practice
             </CardTitle>
             <p className="text-muted-foreground text-sm">
-              Enter password to access the Steno Marker tool
+              Enter password to access
             </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground font-medium">
-                  Password
-                </Label>
+                <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full"
                   autoComplete="off"
                 />
               </div>
@@ -367,16 +235,12 @@ const StenoMarker = () => {
               )}
               
               <Button type="submit" className="w-full">
-                <Lock className="w-4 h-4 mr-2" />
-                Access Steno Marker
+                Access Practice App
               </Button>
               
               <div className="text-center">
-                <Link 
-                  to="/" 
-                  className="text-sm text-primary hover:text-primary/80 transition-colors"
-                >
-                  ← Back to Evaluator
+                <Link to="/" className="text-sm text-primary hover:text-primary/80">
+                  ← Back to Main
                 </Link>
               </div>
             </form>
@@ -386,134 +250,232 @@ const StenoMarker = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-border shadow-card">
-        <div className="text-center text-xs text-muted-foreground py-1 bg-muted/30 border-b border-border">
-          Developed by <span className="font-semibold">[Krishan Kant Surela]</span>
-        </div>
-        <div className="container mx-auto px-4 py-4">
+  // Setup Screen
+  if (isSetupMode) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-8">
+        <div className="max-w-2xl mx-auto space-y-6">
+          {/* Header */}
           <div className="flex items-center justify-between">
-            <Link 
-              to="/" 
-              className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
-            >
+            <Link to="/" className="flex items-center gap-2 text-primary hover:text-primary/80">
               <ArrowLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Back to Evaluator</span>
+              <span className="text-sm font-medium">Back</span>
             </Link>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileText className="w-7 h-7 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground" style={customFontStyle}>
+              Kruti Dev Typing Practice
+            </h1>
+            <div className="w-20"></div>
+          </div>
+
+          <Card className="shadow-elevated">
+            <CardHeader>
+              <CardTitle className="text-xl">Setup Practice Session</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Word List Input */}
+              <div className="space-y-2">
+                <Label htmlFor="wordList" className="text-base font-medium">
+                  Word List
+                </Label>
+                <Textarea
+                  id="wordList"
+                  placeholder="Enter words separated by spaces or new lines..."
+                  value={wordListInput}
+                  onChange={(e) => setWordListInput(e.target.value)}
+                  className="min-h-[200px] text-xl"
+                  style={customFontStyle}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Paste your word list here. Words can be separated by spaces, commas, or new lines.
+                </p>
               </div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Steno Marker
-              </h1>
-            </div>
-            <div className="w-32"></div>
-          </div>
-        </div>
-      </header>
 
-      <main className="flex-1 container mx-auto px-4 py-6 space-y-6">
-        {/* Controls */}
-        <div className="bg-card rounded-xl border border-border p-4 shadow-card">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div>
-              <Label htmlFor="wpm" className="text-sm font-medium mb-2 block">
-                Words Per Minute (WPM)
-              </Label>
-              <Input
-                id="wpm"
-                type="number"
-                value={wpm}
-                onChange={(e) => setWpm(parseInt(e.target.value) || 0)}
-                className="w-full"
-                min={1}
-              />
-            </div>
-            <div>
-              <Label htmlFor="font" className="text-sm font-medium mb-2 block">
-                Font Display
-              </Label>
-              <Select value={fontType} onValueChange={(v) => setFontType(v as 'system' | 'kruti')}>
-                <SelectTrigger id="font">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="system">System Font</SelectItem>
-                  <SelectItem value="kruti">Kruti Dev 010</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={processText} className="flex-1">
-                <Play className="w-4 h-4 mr-2" />
-                Process
-              </Button>
-              <Button onClick={undo} variant="outline" title="Undo last action" disabled={history.length === 0}>
-                <Undo2 className="w-4 h-4" />
-              </Button>
-              <Button onClick={removeMarkers} variant="outline" title="Remove markers from input">
-                <Eraser className="w-4 h-4" />
-              </Button>
-              <Button onClick={copyToClipboard} variant="outline" className="flex-1">
-                <Copy className="w-4 h-4 mr-2" />
-                Copy
-              </Button>
-            </div>
-          </div>
-        </div>
+              {/* Target Repetitions */}
+              <div className="space-y-2">
+                <Label htmlFor="target" className="text-base font-medium">
+                  Target Repetitions
+                </Label>
+                <Input
+                  id="target"
+                  type="number"
+                  value={targetRepetitions}
+                  onChange={(e) => setTargetRepetitions(parseInt(e.target.value) || 100)}
+                  min={1}
+                  max={1000}
+                  className="w-32"
+                />
+                <p className="text-xs text-muted-foreground">
+                  How many times each word should be typed correctly.
+                </p>
+              </div>
 
-        {/* Input and Output */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Input Area */}
-          <div className="bg-card rounded-xl border border-border p-4 shadow-card">
-            <Label className="text-lg font-semibold text-foreground mb-3 block">
-              Dictation Matter
-            </Label>
-            <Textarea
-              placeholder="Paste your dictation text here... Use * to separate different matters. All paragraph breaks will be preserved."
-              value={dictationText}
-              onChange={(e) => setDictationText(e.target.value)}
-              className={`min-h-[400px] resize-none ${fontClass}`}
-              style={{ whiteSpace: 'pre-wrap' }}
-            />
-            <p className="text-xs text-muted-foreground mt-2">
-              Tip: Use <span className="font-mono bg-muted px-1 rounded">*</span> to separate different dictation sections (word count resets). All paragraph breaks are preserved.
+              {/* Font Upload */}
+              <div className="space-y-2">
+                <Label className="text-base font-medium">
+                  Custom Font (Optional)
+                </Label>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg cursor-pointer transition-colors">
+                    <Upload className="w-4 h-4" />
+                    <span className="text-sm">Upload .ttf Font</span>
+                    <input
+                      type="file"
+                      accept=".ttf,.otf,.woff,.woff2"
+                      onChange={handleFontUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {customFontLoaded && (
+                    <span className="text-sm text-green-600 font-medium">
+                      ✓ "{customFontName}" loaded
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Upload a custom font file (TTF/OTF). Default: Kruti Dev 010 (if installed locally).
+                </p>
+              </div>
+
+              {/* Preview */}
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">Font Preview:</p>
+                <p className="text-3xl" style={customFontStyle}>
+                  {wordListInput.split(/[\s\n,]+/).filter(w => w)[0] || "vkidk 'kCn ;gka fn[ksxk"}
+                </p>
+              </div>
+
+              {/* Start Button */}
+              <Button onClick={startPractice} className="w-full h-12 text-lg">
+                <Play className="w-5 h-5 mr-2" />
+                Start Practice
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Practice Screen
+  const currentTargetWord = pendingWords[currentWordIndex] || '';
+  const remainingWords = pendingWords.slice(currentWordIndex);
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      {/* Left Sidebar - Pending Words */}
+      {sidebarVisible && (
+        <div className="w-64 bg-card border-r border-border flex flex-col">
+          <div className="p-4 border-b border-border">
+            <h2 className="font-semibold text-foreground">Pending Words</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              {remainingWords.length} words remaining
             </p>
           </div>
-
-          {/* Output Area */}
-          <div className="bg-card rounded-xl border border-border p-4 shadow-card">
-            <Label className="text-lg font-semibold text-foreground mb-3 block">
-              Marked Output
-            </Label>
-            <div 
-              className={`min-h-[400px] p-4 bg-background border border-border rounded-lg overflow-auto leading-relaxed ${fontClass}`}
-              style={{ whiteSpace: 'pre-wrap' }}
-            >
-              {markedText.length > 0 ? (
-                <>{markedText}</>
-              ) : (
-                <p className="text-muted-foreground italic">
-                  Processed text will appear here...
-                </p>
-              )}
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-2">
+              {remainingWords.map((word, index) => (
+                <div
+                  key={index}
+                  className={`p-2 rounded-lg text-lg ${
+                    index === 0 
+                      ? 'bg-primary/10 text-primary font-bold border-2 border-primary' 
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                  style={customFontStyle}
+                >
+                  {word}
+                </div>
+              ))}
             </div>
-            <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <sup className="font-bold px-1" style={{ backgroundColor: 'yellow' }}>@@</sup>
-                = 15-second interval
-              </span>
-              <span className="flex items-center gap-1">
-                <sup className="font-bold px-1" style={{ backgroundColor: '#00FF00' }}>@@1@@</sup>
-                = Minute marker
-              </span>
+          </ScrollArea>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Toolbar */}
+        <header className="bg-white border-b border-border p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarVisible(!sidebarVisible)}
+                title={sidebarVisible ? "Hide Sidebar" : "Show Sidebar"}
+              >
+                {sidebarVisible ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
+              </Button>
+              <Button variant="outline" size="sm" onClick={goToSetup}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Setup
+              </Button>
+            </div>
+            <div className="flex items-center gap-4">
+              <Button variant="outline" size="sm" onClick={resetCurrentWord}>
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Reset Word
+              </Button>
             </div>
           </div>
+        </header>
+
+        {/* Target Word Display */}
+        <div className="bg-gradient-to-b from-primary/5 to-background p-8 text-center border-b border-border">
+          <p className="text-sm text-muted-foreground mb-2">Current Target Word</p>
+          <h1 
+            className="text-6xl md:text-8xl font-bold text-foreground mb-4"
+            style={customFontStyle}
+          >
+            {currentTargetWord}
+          </h1>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-4xl font-bold text-primary">{currentScore}</span>
+            <span className="text-2xl text-muted-foreground">/</span>
+            <span className="text-4xl font-bold text-muted-foreground">{targetRepetitions}</span>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Word {currentWordIndex + 1} of {pendingWords.length}
+          </p>
         </div>
-      </main>
+
+        {/* Typing Area */}
+        <div className="flex-1 p-4 overflow-hidden">
+          <div 
+            ref={typingAreaRef}
+            className="h-full overflow-auto p-4 bg-card border border-border rounded-lg"
+          >
+            {/* Typed Words History */}
+            <div className="mb-4 flex flex-wrap gap-1" style={customFontStyle}>
+              {typedWords.map((word, index) => (
+                <span
+                  key={index}
+                  className={`text-2xl ${
+                    word.isCorrect ? 'text-green-600' : 'text-red-600'
+                  }`}
+                >
+                  {word.text}{' '}
+                </span>
+              ))}
+            </div>
+
+            {/* Active Input */}
+            <Textarea
+              ref={inputRef}
+              value={typingInput}
+              onChange={(e) => setTypingInput(e.target.value)}
+              onKeyDown={handleTypingKeyDown}
+              placeholder="Start typing here... Press SPACE to check each word"
+              className="min-h-[150px] text-2xl border-2 border-primary/30 focus:border-primary resize-none"
+              style={customFontStyle}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Press <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">SPACE</kbd> or <kbd className="px-1.5 py-0.5 bg-muted rounded text-xs font-mono">ENTER</kbd> to validate each word. 
+              <span className="text-green-600 ml-2">Green = Correct</span>, 
+              <span className="text-red-600 ml-2">Red = Wrong</span>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
