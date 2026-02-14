@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileCheck, Keyboard, Play, ArrowLeft } from 'lucide-react';
-import StenoMarkerTool from '@/components/StenoMarkerTool';
-import TypingPractice from '@/components/TypingPractice';
+import { FileText, ArrowLeft, Copy, Play, Lock, Eraser, Undo2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const CORRECT_PASSWORD = '68194934';
 
@@ -15,7 +15,13 @@ const StenoMarker = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [activeTab, setActiveTab] = useState('steno-marker');
+  
+  const [dictationText, setDictationText] = useState('');
+  const [wpm, setWpm] = useState<number>(80);
+  const [fontType, setFontType] = useState<'system' | 'kruti'>('system');
+  const [markedText, setMarkedText] = useState<React.ReactNode[]>([]);
+  const [history, setHistory] = useState<string[]>([]);
+  const { toast } = useToast();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,32 +34,330 @@ const StenoMarker = () => {
     }
   };
 
+  const saveToHistory = useCallback(() => {
+    setHistory(prev => [...prev, dictationText]);
+  }, [dictationText]);
+
+  const undo = () => {
+    if (history.length === 0) {
+      toast({
+        title: "No History",
+        description: "No previous state to restore.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const previousState = history[history.length - 1];
+    setHistory(prev => prev.slice(0, -1));
+    setDictationText(previousState);
+    setMarkedText([]);
+    toast({
+      title: "Undo Successful",
+      description: "Restored to previous state.",
+    });
+  };
+
+  const removeMarkers = () => {
+    if (!dictationText.trim()) {
+      toast({
+        title: "No Text",
+        description: "Please enter dictation matter first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Save current state to history before removing markers
+    saveToHistory();
+
+    // Remove only markers: @@\d+@@ and @@ patterns while preserving paragraphs
+    let cleanedText = dictationText
+      .replace(/@@\d+@@/g, '') // Remove minute markers like @@1@@, @@2@@
+      .replace(/@@/g, '')      // Remove interval markers @@
+      .replace(/\s\s+/g, ' ')  // Clean up double spaces (but not newlines)
+      .split('\n')
+      .map(line => line.trim())
+      .join('\n');
+
+    setDictationText(cleanedText);
+    setMarkedText([]);
+    toast({
+      title: "Markers Removed",
+      description: "All markers have been removed from the input.",
+    });
+  };
+
+  const processText = () => {
+    if (!dictationText.trim()) {
+      toast({
+        title: "No Text",
+        description: "Please enter dictation matter first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (wpm <= 0) {
+      toast({
+        title: "Invalid WPM",
+        description: "Please enter a valid WPM value.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Save current state to history before processing
+    saveToHistory();
+
+    // FIXED: Accurate interval calculation
+    // Quarter marker appears every (WPM / 4) words
+    // For 70 WPM: interval = Math.floor(70 / 4) = 17 words
+    // For 80 WPM: interval = Math.floor(80 / 4) = 20 words
+    const wordsPerMinute = wpm;
+    const interval = Math.floor(wordsPerMinute / 4);
+    
+    // Split by '*' to get sections (reset word count for each section)
+    const sections = dictationText.split('*');
+    const resultElements: React.ReactNode[] = [];
+    let globalKey = 0;
+
+    sections.forEach((section, sectionIndex) => {
+      // Add '*' separator between sections
+      if (sectionIndex > 0) {
+        resultElements.push(
+          <span key={globalKey++} className="text-purple-600 font-bold">*</span>
+        );
+      }
+
+      // Split section by newlines to preserve paragraph structure
+      const paragraphs = section.split('\n');
+      let wordCount = 0;
+      let minuteCount = 0;
+
+      paragraphs.forEach((paragraph) => {
+        const paragraphContent: React.ReactNode[] = [];
+        
+        // Get words from paragraph, preserving structure
+        const words = paragraph.split(/\s+/).filter(word => word.length > 0);
+        
+        words.forEach((word, wordIndex) => {
+          // Add space before word (except first word in paragraph)
+          if (wordIndex > 0) {
+            paragraphContent.push(<span key={globalKey++}> </span>);
+          }
+
+          // Add the word
+          paragraphContent.push(<span key={globalKey++}>{word}</span>);
+
+          // Increment word count AFTER adding the word
+          wordCount++;
+
+          // FIXED: Check for markers only when wordCount is a multiple of the interval
+          // Check for full minute marker (every WPM words)
+          if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
+            minuteCount++;
+            const minuteMarker = `@@${minuteCount}@@`;
+            paragraphContent.push(
+              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: '#00FF00' }}>
+                {minuteMarker}
+              </sup>
+            );
+          }
+          // Check for interval marker (every interval words, but not if it's also a minute marker)
+          else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
+            paragraphContent.push(
+              <sup key={globalKey++} className="font-bold px-0.5 mx-0.5 text-xs align-super" style={{ backgroundColor: 'yellow' }}>
+                @@
+              </sup>
+            );
+          }
+        });
+
+        // Wrap paragraph content in a p element with margin
+        resultElements.push(
+          <p key={globalKey++} className="mb-3" style={{ marginBottom: '12pt' }}>
+            {paragraphContent.length > 0 ? paragraphContent : <br />}
+          </p>
+        );
+      });
+    });
+
+    setMarkedText(resultElements);
+
+    toast({
+      title: "Text Processed",
+      description: `Marked text with interval every ${interval} words at ${wpm} WPM.`
+    });
+  };
+
+  const copyToClipboard = async () => {
+    if (markedText.length === 0) {
+      toast({
+        title: "No Result",
+        description: "Please process the text first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Create rich HTML for clipboard that preserves paragraph breaks and Word formatting
+      const htmlContent = generateRichHTML();
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': blob
+        })
+      ]);
+
+      toast({
+        title: "Copied!",
+        description: "Marked text copied to clipboard with formatting preserved for MS Word.",
+        duration: 2000
+      });
+    } catch (error) {
+      // Fallback - create plain text version
+      const plainText = generatePlainText();
+      await navigator.clipboard.writeText(plainText);
+      toast({
+        title: "Copied!",
+        description: "Text copied to clipboard (plain text).",
+        duration: 2000
+      });
+    }
+  };
+
+  const generatePlainText = (): string => {
+    const wordsPerMinute = wpm;
+    const interval = Math.floor(wordsPerMinute / 4);
+    const sections = dictationText.split('*');
+    let text = '';
+
+    sections.forEach((section, sectionIndex) => {
+      if (sectionIndex > 0) {
+        text += '*';
+      }
+
+      const paragraphs = section.split('\n');
+      let wordCount = 0;
+      let minuteCount = 0;
+
+      paragraphs.forEach((paragraph, paraIndex) => {
+        if (paraIndex > 0) {
+          text += '\n\n';
+        }
+
+        const words = paragraph.split(/\s+/).filter(word => word.length > 0);
+        
+        words.forEach((word, wordIndex) => {
+          if (wordIndex > 0) {
+            text += ' ';
+          }
+
+          text += word;
+          wordCount++;
+
+          if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
+            minuteCount++;
+            text += ` @@${minuteCount}@@`;
+          } else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
+            text += ' @@';
+          }
+        });
+      });
+    });
+
+    return text;
+  };
+
+  const generateRichHTML = (): string => {
+    const wordsPerMinute = wpm;
+    const interval = Math.floor(wordsPerMinute / 4);
+    const sections = dictationText.split('*');
+    const fontFamily = fontType === 'kruti' ? "'Kruti Dev 010', 'Mangal', Arial, sans-serif" : "inherit";
+    
+    let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
+<head><meta charset="UTF-8"></head>
+<body style="font-family: ${fontFamily}; font-size: 14pt; line-height: 1.6;">`;
+
+    sections.forEach((section, sectionIndex) => {
+      if (sectionIndex > 0) {
+        html += '<span style="color: purple; font-weight: bold;">*</span>';
+      }
+
+      const paragraphs = section.split('\n');
+      let wordCount = 0;
+      let minuteCount = 0;
+
+      paragraphs.forEach((paragraph) => {
+        html += `<p style="margin-bottom: 12pt; font-family: ${fontFamily};">`;
+
+        const words = paragraph.split(/\s+/).filter(word => word.length > 0);
+        
+        if (words.length === 0) {
+          html += '&nbsp;';
+        } else {
+          words.forEach((word, wordIndex) => {
+            if (wordIndex > 0) {
+              html += ' ';
+            }
+
+            html += word;
+            wordCount++;
+
+            // Minute marker - BRIGHT GREEN highlight (#00FF00)
+            if (wordCount > 0 && wordCount % wordsPerMinute === 0) {
+              minuteCount++;
+              html += ` <sup style="font-weight: bold; background-color: #00FF00; mso-highlight: green; vertical-align: super; font-size: smaller;">@@${minuteCount}@@</sup>`;
+            } 
+            // Interval marker - YELLOW highlight
+            else if (interval > 0 && wordCount > 0 && wordCount % interval === 0) {
+              html += ` <sup style="font-weight: bold; background-color: yellow; mso-highlight: yellow; vertical-align: super; font-size: smaller;">@@</sup>`;
+            }
+          });
+        }
+
+        html += '</p>';
+      });
+    });
+
+    html += '</body></html>';
+    return html;
+  };
+
+  const fontClass = fontType === 'kruti' ? 'font-kruti-dev text-xl' : '';
+
   // Login Screen
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-elevated">
+        <Card className="w-full max-w-md shadow-elevation-medium">
           <CardHeader className="text-center space-y-3">
             <div className="mx-auto p-4 bg-primary/10 rounded-full w-fit">
-              <Play className="w-10 h-10 text-primary" />
+              <Lock className="w-10 h-10 text-primary" />
             </div>
             <CardTitle className="text-2xl font-bold text-foreground">
-              Steno Tools
+              Steno Marker Access
             </CardTitle>
             <p className="text-muted-foreground text-sm">
-              Enter password to access
+              Enter password to access the Steno Marker tool
             </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-foreground font-medium">
+                  Password
+                </Label>
                 <Input
                   id="password"
                   type="password"
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  className="w-full"
                   autoComplete="off"
                 />
               </div>
@@ -63,12 +367,16 @@ const StenoMarker = () => {
               )}
               
               <Button type="submit" className="w-full">
-                Access Tools
+                <Lock className="w-4 h-4 mr-2" />
+                Access Steno Marker
               </Button>
               
               <div className="text-center">
-                <Link to="/" className="text-sm text-primary hover:text-primary/80">
-                  ← Back to Main
+                <Link 
+                  to="/" 
+                  className="text-sm text-primary hover:text-primary/80 transition-colors"
+                >
+                  ← Back to Evaluator
                 </Link>
               </div>
             </form>
@@ -80,52 +388,132 @@ const StenoMarker = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header with Navigation */}
-      <header className="bg-card border-b border-border">
+      {/* Header */}
+      <header className="bg-white border-b border-border shadow-card">
+        <div className="text-center text-xs text-muted-foreground py-1 bg-muted/30 border-b border-border">
+          Developed by <span className="font-semibold">[Krishan Kant Surela]</span>
+        </div>
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 text-primary hover:text-primary/80">
+            <Link 
+              to="/" 
+              className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors"
+            >
               <ArrowLeft className="w-5 h-5" />
-              <span className="text-sm font-medium">Back</span>
+              <span className="text-sm font-medium">Back to Evaluator</span>
             </Link>
-            <h1 className="text-xl font-bold text-foreground">Steno Tools</h1>
-            <div className="w-16"></div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <FileText className="w-7 h-7 text-primary" />
+              </div>
+              <h1 className="text-2xl font-bold text-foreground">
+                Steno Marker
+              </h1>
+            </div>
+            <div className="w-32"></div>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 container mx-auto px-4 py-6 space-y-6">
+        {/* Controls */}
+        <div className="bg-card rounded-xl border border-border p-4 shadow-card">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+            <div>
+              <Label htmlFor="wpm" className="text-sm font-medium mb-2 block">
+                Words Per Minute (WPM)
+              </Label>
+              <Input
+                id="wpm"
+                type="number"
+                value={wpm}
+                onChange={(e) => setWpm(parseInt(e.target.value) || 0)}
+                className="w-full"
+                min={1}
+              />
+            </div>
+            <div>
+              <Label htmlFor="font" className="text-sm font-medium mb-2 block">
+                Font Display
+              </Label>
+              <Select value={fontType} onValueChange={(v) => setFontType(v as 'system' | 'kruti')}>
+                <SelectTrigger id="font">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="system">System Font</SelectItem>
+                  <SelectItem value="kruti">Kruti Dev 010</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={processText} className="flex-1">
+                <Play className="w-4 h-4 mr-2" />
+                Process
+              </Button>
+              <Button onClick={undo} variant="outline" title="Undo last action" disabled={history.length === 0}>
+                <Undo2 className="w-4 h-4" />
+              </Button>
+              <Button onClick={removeMarkers} variant="outline" title="Remove markers from input">
+                <Eraser className="w-4 h-4" />
+              </Button>
+              <Button onClick={copyToClipboard} variant="outline" className="flex-1">
+                <Copy className="w-4 h-4 mr-2" />
+                Copy
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="container mx-auto px-4">
-            <TabsList className="w-full max-w-md mx-auto grid grid-cols-2 h-12">
-              <TabsTrigger value="steno-marker" className="flex items-center gap-2 text-sm">
-                <FileCheck className="w-4 h-4" />
-                Steno Marker
-              </TabsTrigger>
-              <TabsTrigger value="typing-practice" className="flex items-center gap-2 text-sm">
-                <Keyboard className="w-4 h-4" />
-                Typing Practice
-              </TabsTrigger>
-            </TabsList>
+        {/* Input and Output */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Input Area */}
+          <div className="bg-card rounded-xl border border-border p-4 shadow-card">
+            <Label className="text-lg font-semibold text-foreground mb-3 block">
+              Dictation Matter
+            </Label>
+            <Textarea
+              placeholder="Paste your dictation text here... Use * to separate different matters. All paragraph breaks will be preserved."
+              value={dictationText}
+              onChange={(e) => setDictationText(e.target.value)}
+              className={`min-h-[400px] resize-none ${fontClass}`}
+              style={{ whiteSpace: 'pre-wrap' }}
+            />
+            <p className="text-xs text-muted-foreground mt-2">
+              Tip: Use <span className="font-mono bg-muted px-1 rounded">*</span> to separate different dictation sections (word count resets). All paragraph breaks are preserved.
+            </p>
           </div>
-        </Tabs>
-      </header>
 
-      {/* Tab Content */}
-      <main className="flex-1">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsContent value="steno-marker" className="mt-0">
-            <StenoMarkerTool />
-          </TabsContent>
-          <TabsContent value="typing-practice" className="mt-0">
-            <TypingPractice />
-          </TabsContent>
-        </Tabs>
+          {/* Output Area */}
+          <div className="bg-card rounded-xl border border-border p-4 shadow-card">
+            <Label className="text-lg font-semibold text-foreground mb-3 block">
+              Marked Output
+            </Label>
+            <div 
+              className={`min-h-[400px] p-4 bg-background border border-border rounded-lg overflow-auto leading-relaxed ${fontClass}`}
+              style={{ whiteSpace: 'pre-wrap' }}
+            >
+              {markedText.length > 0 ? (
+                <>{markedText}</>
+              ) : (
+                <p className="text-muted-foreground italic">
+                  Processed text will appear here...
+                </p>
+              )}
+            </div>
+            <div className="flex gap-4 mt-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <sup className="font-bold px-1" style={{ backgroundColor: 'yellow' }}>@@</sup>
+                = 15-second interval
+              </span>
+              <span className="flex items-center gap-1">
+                <sup className="font-bold px-1" style={{ backgroundColor: '#00FF00' }}>@@1@@</sup>
+                = Minute marker
+              </span>
+            </div>
+          </div>
+        </div>
       </main>
-
-      {/* Footer */}
-      <footer className="py-4 text-center text-sm text-muted-foreground border-t border-border no-print">
-        <p>Steno Tools • Marker & Typing Practice</p>
-      </footer>
     </div>
   );
 };
